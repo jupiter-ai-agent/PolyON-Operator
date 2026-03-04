@@ -1,0 +1,71 @@
+# ── Redis Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-redis
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-redis
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: polyon-redis
+---
+# ── Redis StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-redis
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-redis
+    app.kubernetes.io/part-of: polyon
+spec:
+  serviceName: polyon-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-redis
+  template:
+    metadata:
+      labels:
+        app: polyon-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 50m
+            limits:
+              memory: 256Mi
+              cpu: 200m
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi

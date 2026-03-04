@@ -1,0 +1,107 @@
+# ── PostgreSQL ConfigMap (init scripts) ──
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polyon-db-init
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+data:
+  create-databases.sql: |
+    SELECT 'CREATE DATABASE keycloak' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')\gexec
+    SELECT 'CREATE DATABASE stalwart' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'stalwart')\gexec
+    SELECT 'CREATE DATABASE gitea' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gitea')\gexec
+---
+# ── PostgreSQL Secret ──
+apiVersion: v1
+kind: Secret
+metadata:
+  name: polyon-db-secret
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "{{.PostgresPassword}}"
+---
+# ── PostgreSQL Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-db
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-db
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    app: polyon-db
+---
+# ── PostgreSQL StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-db
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-db
+    app.kubernetes.io/part-of: polyon
+spec:
+  serviceName: polyon-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-db
+  template:
+    metadata:
+      labels:
+        app: polyon-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: polyon-db-secret
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: polyon-db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: pg-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

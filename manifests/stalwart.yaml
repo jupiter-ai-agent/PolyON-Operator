@@ -1,0 +1,97 @@
+# ── Stalwart Mail Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-mail
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-mail
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 25
+      targetPort: 25
+      protocol: TCP
+      name: smtp
+    - port: 587
+      targetPort: 587
+      protocol: TCP
+      name: submission
+    - port: 993
+      targetPort: 993
+      protocol: TCP
+      name: imaps
+    - port: 4190
+      targetPort: 4190
+      protocol: TCP
+      name: sieve
+    - port: 443
+      targetPort: 443
+      protocol: TCP
+      name: https
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: admin
+  selector:
+    app: polyon-mail
+---
+# ── Stalwart Mail StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-mail
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-mail
+    app.kubernetes.io/part-of: polyon
+spec:
+  serviceName: polyon-mail
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-mail
+  template:
+    metadata:
+      labels:
+        app: polyon-mail
+    spec:
+      containers:
+        - name: stalwart
+          image: jupitertriangles/polyon-mail:v1.0.0
+          ports:
+            - containerPort: 25
+            - containerPort: 587
+            - containerPort: 993
+            - containerPort: 4190
+            - containerPort: 443
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+          volumeMounts:
+            - name: stalwart-data
+              mountPath: /opt/stalwart-mail
+  volumeClaimTemplates:
+    - metadata:
+        name: stalwart-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

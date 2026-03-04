@@ -11,6 +11,20 @@ import (
 	"time"
 )
 
+// infraStep defines a single infrastructure deployment step
+type infraStep struct {
+	manifest      string
+	labelSelector string
+	timeout       time.Duration
+}
+
+// serviceStep defines a single service deployment step
+type serviceStep struct {
+	manifest      string
+	labelSelector string
+	timeout       time.Duration
+}
+
 //go:embed wizard.html
 var wizardHTML embed.FS
 
@@ -134,13 +148,32 @@ func runInfraSetup(cfg SetupConfig) {
 		{Name: "MinIO (Object Storage)", Status: "pending"},
 	}
 
+	deploys := []infraStep{
+		{manifest: "postgresql.yaml", labelSelector: "app=polyon-db", timeout: 120 * time.Second},
+		{manifest: "redis.yaml", labelSelector: "app=polyon-redis", timeout: 60 * time.Second},
+		{manifest: "elasticsearch.yaml", labelSelector: "app=polyon-es", timeout: 180 * time.Second},
+		{manifest: "minio.yaml", labelSelector: "app=polyon-minio", timeout: 120 * time.Second},
+	}
+
 	mu.Lock()
 	progress.Steps = steps
 	progress.Total = len(steps)
 	progress.Step = 0
 	mu.Unlock()
 
+	tcfg := NewTemplateConfig(cfg)
+
 	log.Printf("[INFRA] Starting infrastructure setup: ns=%s domain=%s", cfg.Namespace, cfg.Domain)
+
+	// Create namespace first
+	if err := ensureNamespace(tcfg); err != nil {
+		mu.Lock()
+		progress.State = "error"
+		progress.Message = "네임스페이스 생성 실패: " + err.Error()
+		mu.Unlock()
+		log.Printf("[INFRA] Namespace creation failed: %v", err)
+		return
+	}
 
 	for i := range steps {
 		mu.Lock()
@@ -151,11 +184,15 @@ func runInfraSetup(cfg SetupConfig) {
 
 		log.Printf("[INFRA] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
 
-		// TODO: Replace with actual Helm/K8s install logic
-		// - Create namespace if not exists
-		// - Apply K8s manifests (StatefulSet, Service, ConfigMap, PVC)
-		// - Wait for Pod ready
-		time.Sleep(2 * time.Second) // demo delay
+		if err := deployManifest(deploys[i].manifest, deploys[i].labelSelector, tcfg, deploys[i].timeout); err != nil {
+			mu.Lock()
+			progress.Steps[i].Status = "error"
+			progress.State = "error"
+			progress.Message = steps[i].Name + " 설치 실패: " + err.Error()
+			mu.Unlock()
+			log.Printf("[INFRA] Failed to install %s: %v", steps[i].Name, err)
+			return
+		}
 
 		mu.Lock()
 		progress.Steps[i].Status = "done"
@@ -177,12 +214,20 @@ func runServicesSetup(cfg SetupConfig) {
 		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
 	}
 
+	deploys := []serviceStep{
+		{manifest: "samba-dc.yaml", labelSelector: "app=polyon-dc", timeout: 180 * time.Second},
+		{manifest: "keycloak.yaml", labelSelector: "app=polyon-auth", timeout: 180 * time.Second},
+		{manifest: "stalwart.yaml", labelSelector: "app=polyon-mail", timeout: 120 * time.Second},
+	}
+
 	mu.Lock()
 	progress.Steps = steps
 	progress.Total = len(steps)
 	progress.Step = 0
 	progress.State = "installing"
 	mu.Unlock()
+
+	tcfg := NewTemplateConfig(cfg)
 
 	log.Printf("[SERVICES] Starting services setup: domain=%s", cfg.Domain)
 
@@ -195,11 +240,15 @@ func runServicesSetup(cfg SetupConfig) {
 
 		log.Printf("[SERVICES] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
 
-		// TODO: Replace with actual install logic
-		// - Samba DC: provision domain, create admin account
-		// - Keycloak: create realms (admin, helios), LDAP federation, OIDC clients
-		// - Stalwart: configure LDAP directory, ES FTS, domain
-		time.Sleep(3 * time.Second) // demo delay
+		if err := deployManifest(deploys[i].manifest, deploys[i].labelSelector, tcfg, deploys[i].timeout); err != nil {
+			mu.Lock()
+			progress.Steps[i].Status = "error"
+			progress.State = "error"
+			progress.Message = steps[i].Name + " 설치 실패: " + err.Error()
+			mu.Unlock()
+			log.Printf("[SERVICES] Failed to install %s: %v", steps[i].Name, err)
+			return
+		}
 
 		mu.Lock()
 		progress.Steps[i].Status = "done"
