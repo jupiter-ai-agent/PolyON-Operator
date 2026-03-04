@@ -29,228 +29,350 @@
     align-items: center;
     justify-content: center;
   }
-  .container {
-    width: 100%;
-    max-width: 560px;
-    padding: 2rem;
-  }
-  .logo {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
-  .logo h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    letter-spacing: -0.5px;
-  }
+  .container { width: 100%; max-width: 600px; padding: 2rem; }
+  .logo { text-align: center; margin-bottom: 2rem; }
+  .logo h1 { font-size: 2rem; font-weight: 600; letter-spacing: -0.5px; }
   .logo h1 span { color: var(--primary); }
-  .logo p {
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
+  .logo p { color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem; }
+  .card { background: var(--bg-card); border-radius: 8px; padding: 2rem; }
+  .card-header {
+    font-size: 1rem; font-weight: 600; margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem; border-bottom: 1px solid #393939;
   }
-  .card {
-    background: var(--bg-card);
-    border-radius: 8px;
-    padding: 2rem;
-  }
-  .field {
-    margin-bottom: 1.5rem;
-  }
-  .field label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.32px;
-  }
-  .field input, .field select {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    background: var(--bg-input);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    color: var(--text);
-    font-size: 0.875rem;
-    outline: none;
-    transition: border-color 0.15s;
-  }
-  .field input:focus, .field select:focus {
-    border-color: var(--primary);
-  }
-  .field .hint {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: 0.25rem;
-  }
-  .btn {
-    width: 100%;
-    padding: 0.875rem;
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s;
-    letter-spacing: 0.16px;
-  }
-  .btn:hover { background: var(--primary-hover); }
-  .btn:disabled {
-    background: var(--border);
-    cursor: not-allowed;
+  .card-header .step-badge {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-right: 0.5rem;
   }
 
-  /* Progress */
-  #progress-view { display: none; }
-  .step-list {
-    list-style: none;
-    margin-bottom: 1.5rem;
+  /* Stepper */
+  .stepper { display: flex; justify-content: center; margin-bottom: 2rem; gap: 0; }
+  .stepper-item {
+    display: flex; align-items: center; font-size: 0.75rem; color: var(--pending);
   }
+  .stepper-dot {
+    width: 28px; height: 28px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-weight: 600;
+    border: 2px solid var(--pending); margin: 0 4px; font-size: 0.75rem;
+  }
+  .stepper-item.active .stepper-dot { border-color: var(--primary); color: var(--primary); }
+  .stepper-item.done .stepper-dot { background: var(--success); border-color: var(--success); color: #000; }
+  .stepper-line { width: 32px; height: 2px; background: var(--pending); margin-top: 1px; }
+  .stepper-line.done { background: var(--success); }
+
+  /* Form */
+  .field { margin-bottom: 1.25rem; }
+  .field label {
+    display: block; font-size: 0.75rem; font-weight: 500;
+    color: var(--text-secondary); margin-bottom: 0.5rem;
+    text-transform: uppercase; letter-spacing: 0.32px;
+  }
+  .field input, .field select {
+    width: 100%; padding: 0.75rem 1rem; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+    font-size: 0.875rem; outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--primary); }
+  .field .hint { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+  /* App selection */
+  .app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .app-item {
+    display: flex; align-items: center; padding: 0.75rem 1rem;
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 4px; cursor: pointer; transition: border-color 0.15s;
+  }
+  .app-item:hover { border-color: var(--text-secondary); }
+  .app-item.selected { border-color: var(--primary); background: #0f62fe20; }
+  .app-item input[type=checkbox] { margin-right: 0.75rem; accent-color: var(--primary); }
+  .app-item .app-name { font-size: 0.875rem; }
+  .app-item .app-desc { font-size: 0.7rem; color: var(--text-secondary); }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+  .btn {
+    flex: 1; padding: 0.875rem; border: none; border-radius: 4px;
+    font-size: 0.875rem; font-weight: 500; cursor: pointer; letter-spacing: 0.16px;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-primary:disabled { background: var(--border); cursor: not-allowed; }
+  .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: #393939; }
+
+  /* Progress */
+  .step-list { list-style: none; margin-bottom: 1rem; }
   .step-list li {
-    display: flex;
-    align-items: center;
-    padding: 0.625rem 0;
-    border-bottom: 1px solid #393939;
-    font-size: 0.875rem;
+    display: flex; align-items: center; padding: 0.625rem 0;
+    border-bottom: 1px solid #393939; font-size: 0.875rem;
   }
   .step-list li:last-child { border-bottom: none; }
   .step-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    margin-right: 0.75rem;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; margin-right: 0.75rem;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     font-size: 0.625rem;
   }
   .step-icon.pending { border: 2px solid var(--pending); }
-  .step-icon.running {
-    border: 2px solid var(--running);
-    animation: pulse 1.5s infinite;
-  }
+  .step-icon.running { border: 2px solid var(--running); animation: pulse 1.5s infinite; }
   .step-icon.done { background: var(--success); }
   .step-icon.done::after { content: "✓"; color: #000; font-weight: bold; }
   .step-icon.error { background: var(--error); }
   .step-icon.error::after { content: "✕"; color: #fff; font-weight: bold; }
-  .status-msg {
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    margin-top: 1rem;
-  }
+  .status-msg { text-align: center; color: var(--text-secondary); font-size: 0.875rem; margin-top: 1rem; }
   .status-msg.complete { color: var(--success); font-weight: 600; }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
+  .hidden { display: none !important; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 </style>
 </head>
 <body>
 <div class="container">
   <div class="logo">
     <h1>Poly<span>ON</span></h1>
-    <p>Setup Wizard — Kubernetes</p>
+    <p>Setup Wizard</p>
   </div>
 
-  <!-- Setup Form -->
-  <div class="card" id="setup-form">
+  <!-- Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="stepper-item active" data-step="1"><div class="stepper-dot">1</div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" data-step="2"><div class="stepper-dot">2</div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" data-step="3"><div class="stepper-dot">3</div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" data-step="4"><div class="stepper-dot">4</div></div>
+    <div class="stepper-line"></div>
+    <div class="stepper-item" data-step="5"><div class="stepper-dot">5</div></div>
+  </div>
+
+  <!-- Step 1: 기본 설정 -->
+  <div class="card step-card" id="step-1">
+    <div class="card-header"><span class="step-badge">Step 1</span>기본 설정</div>
     <div class="field">
       <label>Namespace</label>
       <input type="text" id="namespace" value="polyon" placeholder="polyon">
-      <div class="hint">K8s namespace for all PolyON services</div>
+      <div class="hint">PolyON 서비스가 설치될 K8s namespace</div>
     </div>
     <div class="field">
       <label>Domain</label>
       <input type="text" id="domain" placeholder="EXAMPLE.COM">
-      <div class="hint">Active Directory domain (uppercase)</div>
+      <div class="hint">Active Directory 도메인 (대문자)</div>
     </div>
     <div class="field">
       <label>Organization Name</label>
-      <input type="text" id="orgName" placeholder="My Company">
+      <input type="text" id="orgName" placeholder="회사/조직 이름">
     </div>
     <div class="field">
       <label>Administrator Password</label>
-      <input type="password" id="adminPassword" placeholder="Min 8 characters">
-      <div class="hint">AD Domain Administrator password</div>
+      <input type="password" id="adminPassword" placeholder="8자 이상">
+      <div class="hint">도메인 관리자 비밀번호</div>
     </div>
-    <button class="btn" id="startBtn" onclick="startSetup()">설치 시작</button>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="goToStep(2)">다음 →</button>
+    </div>
   </div>
 
-  <!-- Progress View -->
-  <div class="card" id="progress-view">
-    <ul class="step-list" id="stepList"></ul>
-    <div class="status-msg" id="statusMsg">준비 중...</div>
+  <!-- Step 2: 인프라 설치 -->
+  <div class="card step-card hidden" id="step-2">
+    <div class="card-header"><span class="step-badge">Step 2</span>인프라 설치</div>
+    <ul class="step-list" id="infra-steps">
+      <li><div class="step-icon pending"></div>PostgreSQL (Database)</li>
+      <li><div class="step-icon pending"></div>Redis (Cache)</li>
+      <li><div class="step-icon pending"></div>Elasticsearch (Search)</li>
+      <li><div class="step-icon pending"></div>MinIO (Object Storage)</li>
+    </ul>
+    <div class="status-msg" id="infra-status">설치 시작 대기 중...</div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="goToStep(1)">← 이전</button>
+      <button class="btn btn-primary" id="infra-start-btn" onclick="startInfra()">설치 시작</button>
+    </div>
+  </div>
+
+  <!-- Step 3: 서비스 설치 -->
+  <div class="card step-card hidden" id="step-3">
+    <div class="card-header"><span class="step-badge">Step 3</span>서비스 설치</div>
+    <ul class="step-list" id="service-steps">
+      <li><div class="step-icon pending"></div>Samba AD DC (Active Directory)</li>
+      <li><div class="step-icon pending"></div>Keycloak (SSO / 인증)</li>
+      <li><div class="step-icon pending"></div>Stalwart Mail (메일 서버)</li>
+    </ul>
+    <div class="status-msg" id="service-status">인프라 설치 완료 후 자동 진행...</div>
+  </div>
+
+  <!-- Step 4: 앱 선택 -->
+  <div class="card step-card hidden" id="step-4">
+    <div class="card-header"><span class="step-badge">Step 4</span>앱 선택</div>
+    <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">설치할 앱을 선택하세요.</p>
+    <div class="app-grid">
+      <label class="app-item selected" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="chat" checked>
+        <div><div class="app-name">Chat</div><div class="app-desc">팀 메신저</div></div>
+      </label>
+      <label class="app-item selected" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="wiki" checked>
+        <div><div class="app-name">Wiki</div><div class="app-desc">지식 관리</div></div>
+      </label>
+      <label class="app-item" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="bpmn">
+        <div><div class="app-name">BPM</div><div class="app-desc">업무 프로세스</div></div>
+      </label>
+      <label class="app-item" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="ai">
+        <div><div class="app-name">AI Agent</div><div class="app-desc">AI 어시스턴트</div></div>
+      </label>
+      <label class="app-item" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="monitoring">
+        <div><div class="app-name">Monitoring</div><div class="app-desc">시스템 모니터링</div></div>
+      </label>
+      <label class="app-item" onclick="this.classList.toggle('selected')">
+        <input type="checkbox" value="automation">
+        <div><div class="app-name">Automation</div><div class="app-desc">워크플로 자동화</div></div>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="apps-install-btn" onclick="startApps()">선택한 앱 설치 →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: 완료 -->
+  <div class="card step-card hidden" id="step-5">
+    <div class="card-header"><span class="step-badge">Step 5</span>설치 완료</div>
+    <div style="text-align:center; padding:2rem 0;">
+      <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+      <h2 style="font-size:1.25rem; margin-bottom:0.5rem;">PolyON 설치가 완료되었습니다</h2>
+      <p style="color:var(--text-secondary); font-size:0.875rem; margin-bottom:0.25rem;">
+        Domain: <strong id="final-domain"></strong>
+      </p>
+      <p style="color:var(--text-secondary); font-size:0.875rem; margin-bottom:2rem;">
+        Namespace: <strong id="final-ns"></strong>
+      </p>
+      <button class="btn btn-primary" onclick="goToConsole()" style="max-width:300px; margin:0 auto;">
+        Console 로그인 →
+      </button>
+      <p style="color:var(--text-secondary); font-size:0.75rem; margin-top:0.75rem;">
+        Keycloak 로그인 화면으로 이동합니다
+      </p>
+    </div>
   </div>
 </div>
 
 <script>
-async function startSetup() {
-  const ns = document.getElementById('namespace').value.trim();
-  const domain = document.getElementById('domain').value.trim();
-  const orgName = document.getElementById('orgName').value.trim();
-  const pw = document.getElementById('adminPassword').value;
+let currentStep = 1;
+let config = {};
 
-  if (!domain || !pw || pw.length < 8) {
-    alert('도메인과 비밀번호(8자 이상)를 입력해주세요.');
-    return;
+function goToStep(step) {
+  // Validate Step 1
+  if (currentStep === 1 && step === 2) {
+    const ns = document.getElementById('namespace').value.trim();
+    const domain = document.getElementById('domain').value.trim();
+    const orgName = document.getElementById('orgName').value.trim();
+    const pw = document.getElementById('adminPassword').value;
+    if (!ns) { alert('Namespace를 입력해주세요.'); return; }
+    if (!domain) { alert('Domain을 입력해주세요.'); return; }
+    if (!orgName) { alert('Organization Name을 입력해주세요.'); return; }
+    if (!pw || pw.length < 8) { alert('비밀번호를 8자 이상 입력해주세요.'); return; }
+    config = { namespace: ns, domain: domain, orgName: orgName, adminPassword: pw };
   }
 
-  document.getElementById('startBtn').disabled = true;
+  document.querySelectorAll('.step-card').forEach(c => c.classList.add('hidden'));
+  document.getElementById('step-' + step).classList.remove('hidden');
+
+  // Update stepper
+  document.querySelectorAll('.stepper-item').forEach(item => {
+    const s = parseInt(item.dataset.step);
+    item.classList.remove('active', 'done');
+    if (s < step) item.classList.add('done');
+    else if (s === step) item.classList.add('active');
+  });
+  document.querySelectorAll('.stepper-line').forEach((line, i) => {
+    line.classList.toggle('done', i < step - 1);
+  });
+
+  currentStep = step;
+}
+
+async function startInfra() {
+  document.getElementById('infra-start-btn').disabled = true;
+  document.getElementById('infra-status').textContent = '설치 시작 중...';
 
   const res = await fetch('/api/setup', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      namespace: ns || 'polyon',
-      domain: domain,
-      orgName: orgName,
-      adminPassword: pw
-    })
+    body: JSON.stringify({...config, phase: 'infra'})
   });
 
   if (!res.ok) {
-    alert('Setup failed: ' + await res.text());
-    document.getElementById('startBtn').disabled = false;
+    alert('설치 실패: ' + await res.text());
+    document.getElementById('infra-start-btn').disabled = false;
     return;
   }
 
-  document.getElementById('setup-form').style.display = 'none';
-  document.getElementById('progress-view').style.display = 'block';
-  pollProgress();
+  pollPhase('infra', 'infra-steps', 'infra-status', 4, () => {
+    goToStep(3);
+    startServices();
+  });
 }
 
-async function pollProgress() {
-  const res = await fetch('/api/state');
-  const data = await res.json();
-  const list = document.getElementById('stepList');
-  const msg = document.getElementById('statusMsg');
+async function startServices() {
+  document.getElementById('service-status').textContent = '서비스 설치 중...';
 
-  list.innerHTML = '';
-  data.steps.forEach((s, i) => {
-    const li = document.createElement('li');
-    li.innerHTML = `<div class="step-icon ${s.status}"></div>
-                    <span>[${i+1}/${data.total}] ${s.name}</span>`;
-    list.appendChild(li);
+  const res = await fetch('/api/setup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({...config, phase: 'services'})
   });
 
-  if (data.state === 'setting_up') {
-    msg.textContent = data.message || '설치 중...';
-    msg.className = 'status-msg';
-    setTimeout(pollProgress, 1000);
-  } else if (data.state === 'running') {
-    msg.textContent = '✅ 설치 완료';
-    msg.className = 'status-msg complete';
-  } else if (data.state === 'error') {
-    msg.textContent = '❌ ' + data.message;
-    msg.className = 'status-msg';
+  pollPhase('services', 'service-steps', 'service-status', 3, () => {
+    goToStep(4);
+  });
+}
+
+async function startApps() {
+  document.getElementById('apps-install-btn').disabled = true;
+  const apps = [];
+  document.querySelectorAll('.app-item input:checked').forEach(cb => apps.push(cb.value));
+  config.apps = apps;
+
+  const res = await fetch('/api/setup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({...config, phase: 'apps'})
+  });
+
+  document.getElementById('final-domain').textContent = config.domain;
+  document.getElementById('final-ns').textContent = config.namespace;
+  goToStep(5);
+}
+
+async function pollPhase(phase, listId, statusId, total, onComplete) {
+  const res = await fetch('/api/state');
+  const data = await res.json();
+  const list = document.getElementById(listId);
+  const items = list.querySelectorAll('li .step-icon');
+
+  if (data.steps) {
+    data.steps.forEach((s, i) => {
+      if (i < items.length) {
+        items[i].className = 'step-icon ' + s.status;
+      }
+    });
   }
+
+  document.getElementById(statusId).textContent = data.message || '설치 중...';
+
+  if (data.state === 'phase_done') {
+    document.getElementById(statusId).textContent = '✅ 완료';
+    document.getElementById(statusId).className = 'status-msg complete';
+    setTimeout(onComplete, 1000);
+  } else if (data.state === 'error') {
+    document.getElementById(statusId).textContent = '❌ ' + data.message;
+  } else {
+    setTimeout(() => pollPhase(phase, listId, statusId, total, onComplete), 1500);
+  }
+}
+
+function goToConsole() {
+  const domain = config.domain ? config.domain.toLowerCase() : 'cmars.com';
+  window.location.href = 'https://console.' + domain + '/auth/realms/admin/protocol/openid-connect/auth?client_id=polyon-console&redirect_uri=https://console.' + domain + '&response_type=code&scope=openid';
 }
 </script>
 </body>

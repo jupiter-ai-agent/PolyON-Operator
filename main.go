@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 //go:embed wizard.html
@@ -15,18 +16,21 @@ var wizardHTML embed.FS
 
 // SetupConfig holds the wizard form data
 type SetupConfig struct {
-	Namespace     string `json:"namespace"`
-	Domain        string `json:"domain"`
-	AdminPassword string `json:"adminPassword"`
-	OrgName       string `json:"orgName"`
+	Namespace     string   `json:"namespace"`
+	Domain        string   `json:"domain"`
+	AdminPassword string   `json:"adminPassword"`
+	OrgName       string   `json:"orgName"`
+	Phase         string   `json:"phase"` // infra, services, apps
+	Apps          []string `json:"apps"`
 }
 
 // SetupProgress tracks installation progress
 type SetupProgress struct {
-	State   string `json:"state"` // fresh, setting_up, running, error
-	Step    int    `json:"step"`
-	Total   int    `json:"total"`
-	Message string `json:"message"`
+	State   string       `json:"state"` // fresh, installing, phase_done, running, error
+	Phase   string       `json:"phase"`
+	Step    int          `json:"step"`
+	Total   int          `json:"total"`
+	Message string       `json:"message"`
 	Steps   []StepStatus `json:"steps"`
 }
 
@@ -37,26 +41,12 @@ type StepStatus struct {
 
 var (
 	progress SetupProgress
+	config   SetupConfig
 	mu       sync.Mutex
 )
 
 func init() {
-	progress = SetupProgress{
-		State: "fresh",
-		Total: 10,
-		Steps: []StepStatus{
-			{Name: "Namespace 생성", Status: "pending"},
-			{Name: "PostgreSQL", Status: "pending"},
-			{Name: "Redis", Status: "pending"},
-			{Name: "Elasticsearch", Status: "pending"},
-			{Name: "MinIO (Object Storage)", Status: "pending"},
-			{Name: "Samba AD DC", Status: "pending"},
-			{Name: "Keycloak (SSO)", Status: "pending"},
-			{Name: "Stalwart Mail", Status: "pending"},
-			{Name: "PolyON Core", Status: "pending"},
-			{Name: "PolyON Console", Status: "pending"},
-		},
-	}
+	progress = SetupProgress{State: "fresh"}
 }
 
 func main() {
@@ -67,6 +57,10 @@ func main() {
 
 	// Wizard UI
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 		data, _ := wizardHTML.ReadFile("wizard.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(data)
@@ -86,7 +80,7 @@ func main() {
 		json.NewEncoder(w).Encode(progress)
 	})
 
-	// Start setup
+	// Start setup phase
 	http.HandleFunc("/api/setup", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "POST only", 405)
@@ -100,38 +94,68 @@ func main() {
 		}
 
 		mu.Lock()
-		if progress.State == "setting_up" {
+		if progress.State == "installing" {
 			mu.Unlock()
-			http.Error(w, "setup already in progress", 409)
+			http.Error(w, "installation in progress", 409)
 			return
 		}
-		progress.State = "setting_up"
+		config = cfg
+		progress.State = "installing"
+		progress.Phase = cfg.Phase
 		mu.Unlock()
 
-		// Run setup in background
-		go runSetup(cfg)
+		switch cfg.Phase {
+		case "infra":
+			go runInfraSetup(cfg)
+		case "services":
+			go runServicesSetup(cfg)
+		case "apps":
+			go runAppsSetup(cfg)
+		default:
+			mu.Lock()
+			progress.State = "error"
+			progress.Message = "unknown phase: " + cfg.Phase
+			mu.Unlock()
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "started"})
+		json.NewEncoder(w).Encode(map[string]string{"status": "started", "phase": cfg.Phase})
 	})
 
-	log.Printf("PolyON Operator starting on :%s", port)
+	log.Printf("PolyON Operator v0.1.0 starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-func runSetup(cfg SetupConfig) {
-	log.Printf("Setup started: domain=%s namespace=%s org=%s", cfg.Domain, cfg.Namespace, cfg.OrgName)
+func runInfraSetup(cfg SetupConfig) {
+	steps := []StepStatus{
+		{Name: "PostgreSQL (Database)", Status: "pending"},
+		{Name: "Redis (Cache)", Status: "pending"},
+		{Name: "Elasticsearch (Search)", Status: "pending"},
+		{Name: "MinIO (Object Storage)", Status: "pending"},
+	}
 
-	for i := range progress.Steps {
+	mu.Lock()
+	progress.Steps = steps
+	progress.Total = len(steps)
+	progress.Step = 0
+	mu.Unlock()
+
+	log.Printf("[INFRA] Starting infrastructure setup: ns=%s domain=%s", cfg.Namespace, cfg.Domain)
+
+	for i := range steps {
 		mu.Lock()
 		progress.Step = i + 1
-		progress.Message = progress.Steps[i].Name + " 설치 중..."
+		progress.Message = steps[i].Name + " 설치 중..."
 		progress.Steps[i].Status = "running"
 		mu.Unlock()
 
-		// TODO: 실제 Helm install 로직 구현
-		// 현재는 데모용 딜레이
-		log.Printf("[%d/%d] %s", i+1, progress.Total, progress.Steps[i].Name)
+		log.Printf("[INFRA] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
+
+		// TODO: Replace with actual Helm/K8s install logic
+		// - Create namespace if not exists
+		// - Apply K8s manifests (StatefulSet, Service, ConfigMap, PVC)
+		// - Wait for Pod ready
+		time.Sleep(2 * time.Second) // demo delay
 
 		mu.Lock()
 		progress.Steps[i].Status = "done"
@@ -139,9 +163,65 @@ func runSetup(cfg SetupConfig) {
 	}
 
 	mu.Lock()
-	progress.State = "running"
-	progress.Message = "설치 완료"
+	progress.State = "phase_done"
+	progress.Message = "인프라 설치 완료"
 	mu.Unlock()
 
-	log.Printf("Setup completed for domain=%s", cfg.Domain)
+	log.Printf("[INFRA] Infrastructure setup complete")
+}
+
+func runServicesSetup(cfg SetupConfig) {
+	steps := []StepStatus{
+		{Name: "Samba AD DC (Active Directory)", Status: "pending"},
+		{Name: "Keycloak (SSO / 인증)", Status: "pending"},
+		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
+	}
+
+	mu.Lock()
+	progress.Steps = steps
+	progress.Total = len(steps)
+	progress.Step = 0
+	progress.State = "installing"
+	mu.Unlock()
+
+	log.Printf("[SERVICES] Starting services setup: domain=%s", cfg.Domain)
+
+	for i := range steps {
+		mu.Lock()
+		progress.Step = i + 1
+		progress.Message = steps[i].Name + " 설치 중..."
+		progress.Steps[i].Status = "running"
+		mu.Unlock()
+
+		log.Printf("[SERVICES] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
+
+		// TODO: Replace with actual install logic
+		// - Samba DC: provision domain, create admin account
+		// - Keycloak: create realms (admin, helios), LDAP federation, OIDC clients
+		// - Stalwart: configure LDAP directory, ES FTS, domain
+		time.Sleep(3 * time.Second) // demo delay
+
+		mu.Lock()
+		progress.Steps[i].Status = "done"
+		mu.Unlock()
+	}
+
+	mu.Lock()
+	progress.State = "phase_done"
+	progress.Message = "서비스 설치 완료"
+	mu.Unlock()
+
+	log.Printf("[SERVICES] Services setup complete")
+}
+
+func runAppsSetup(cfg SetupConfig) {
+	log.Printf("[APPS] Installing apps: %v", cfg.Apps)
+
+	mu.Lock()
+	progress.State = "running"
+	progress.Message = "앱 설치 완료"
+	progress.Phase = "complete"
+	mu.Unlock()
+
+	log.Printf("[APPS] Setup fully complete. Domain=%s NS=%s", cfg.Domain, cfg.Namespace)
 }
