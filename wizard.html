@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PolyON Setup Wizard</title>
+<style>
+  :root {
+    --primary: #0f62fe;
+    --primary-hover: #0353e9;
+    --bg: #161616;
+    --bg-card: #262626;
+    --bg-input: #393939;
+    --text: #f4f4f4;
+    --text-secondary: #c6c6c6;
+    --border: #525252;
+    --success: #42be65;
+    --running: #4589ff;
+    --error: #da1e28;
+    --pending: #6f6f6f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 560px;
+    padding: 2rem;
+  }
+  .logo {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .logo h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+  .logo h1 span { color: var(--primary); }
+  .logo p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+  }
+  .card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 2rem;
+  }
+  .field {
+    margin-bottom: 1.5rem;
+  }
+  .field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.32px;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--primary);
+  }
+  .field .hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+  .btn {
+    width: 100%;
+    padding: 0.875rem;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: 0.16px;
+  }
+  .btn:hover { background: var(--primary-hover); }
+  .btn:disabled {
+    background: var(--border);
+    cursor: not-allowed;
+  }
+
+  /* Progress */
+  #progress-view { display: none; }
+  .step-list {
+    list-style: none;
+    margin-bottom: 1.5rem;
+  }
+  .step-list li {
+    display: flex;
+    align-items: center;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid #393939;
+    font-size: 0.875rem;
+  }
+  .step-list li:last-child { border-bottom: none; }
+  .step-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625rem;
+  }
+  .step-icon.pending { border: 2px solid var(--pending); }
+  .step-icon.running {
+    border: 2px solid var(--running);
+    animation: pulse 1.5s infinite;
+  }
+  .step-icon.done { background: var(--success); }
+  .step-icon.done::after { content: "✓"; color: #000; font-weight: bold; }
+  .step-icon.error { background: var(--error); }
+  .step-icon.error::after { content: "✕"; color: #fff; font-weight: bold; }
+  .status-msg {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 1rem;
+  }
+  .status-msg.complete { color: var(--success); font-weight: 600; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">
+    <h1>Poly<span>ON</span></h1>
+    <p>Setup Wizard — Kubernetes</p>
+  </div>
+
+  <!-- Setup Form -->
+  <div class="card" id="setup-form">
+    <div class="field">
+      <label>Namespace</label>
+      <input type="text" id="namespace" value="polyon" placeholder="polyon">
+      <div class="hint">K8s namespace for all PolyON services</div>
+    </div>
+    <div class="field">
+      <label>Domain</label>
+      <input type="text" id="domain" placeholder="EXAMPLE.COM">
+      <div class="hint">Active Directory domain (uppercase)</div>
+    </div>
+    <div class="field">
+      <label>Organization Name</label>
+      <input type="text" id="orgName" placeholder="My Company">
+    </div>
+    <div class="field">
+      <label>Administrator Password</label>
+      <input type="password" id="adminPassword" placeholder="Min 8 characters">
+      <div class="hint">AD Domain Administrator password</div>
+    </div>
+    <button class="btn" id="startBtn" onclick="startSetup()">설치 시작</button>
+  </div>
+
+  <!-- Progress View -->
+  <div class="card" id="progress-view">
+    <ul class="step-list" id="stepList"></ul>
+    <div class="status-msg" id="statusMsg">준비 중...</div>
+  </div>
+</div>
+
+<script>
+async function startSetup() {
+  const ns = document.getElementById('namespace').value.trim();
+  const domain = document.getElementById('domain').value.trim();
+  const orgName = document.getElementById('orgName').value.trim();
+  const pw = document.getElementById('adminPassword').value;
+
+  if (!domain || !pw || pw.length < 8) {
+    alert('도메인과 비밀번호(8자 이상)를 입력해주세요.');
+    return;
+  }
+
+  document.getElementById('startBtn').disabled = true;
+
+  const res = await fetch('/api/setup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      namespace: ns || 'polyon',
+      domain: domain,
+      orgName: orgName,
+      adminPassword: pw
+    })
+  });
+
+  if (!res.ok) {
+    alert('Setup failed: ' + await res.text());
+    document.getElementById('startBtn').disabled = false;
+    return;
+  }
+
+  document.getElementById('setup-form').style.display = 'none';
+  document.getElementById('progress-view').style.display = 'block';
+  pollProgress();
+}
+
+async function pollProgress() {
+  const res = await fetch('/api/state');
+  const data = await res.json();
+  const list = document.getElementById('stepList');
+  const msg = document.getElementById('statusMsg');
+
+  list.innerHTML = '';
+  data.steps.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="step-icon ${s.status}"></div>
+                    <span>[${i+1}/${data.total}] ${s.name}</span>`;
+    list.appendChild(li);
+  });
+
+  if (data.state === 'setting_up') {
+    msg.textContent = data.message || '설치 중...';
+    msg.className = 'status-msg';
+    setTimeout(pollProgress, 1000);
+  } else if (data.state === 'running') {
+    msg.textContent = '✅ 설치 완료';
+    msg.className = 'status-msg complete';
+  } else if (data.state === 'error') {
+    msg.textContent = '❌ ' + data.message;
+    msg.className = 'status-msg';
+  }
+}
+</script>
+</body>
+</html>

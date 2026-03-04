@@ -1,6 +1,6 @@
 FROM golang:1.23-alpine AS builder
 WORKDIR /build
-COPY go.mod main.go ./
+COPY go.mod main.go wizard.html ./
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /polyon-operator .
 
 FROM alpine:3.21
