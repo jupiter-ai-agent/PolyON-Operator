@@ -22,8 +22,8 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Keycloak 준비 완료")
 
-	// 2. Get admin token (use ConsoleAdminPassword for Keycloak)
-	token, err := getKeycloakToken(keycloakURL, tcfg.ConsoleAdminPassword)
+	// 2. Get admin token (use AdminPassword — matches KC_BOOTSTRAP_ADMIN_PASSWORD)
+	token, err := getKeycloakToken(keycloakURL, tcfg.AdminPassword)
 	if err != nil {
 		return fmt.Errorf("get admin token: %w", err)
 	}
@@ -64,22 +64,27 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-portal 클라이언트 생성 완료 (helios realm)")
 
-	// 7. Create LDAP federation in both realms
-	for _, realm := range []string{"admin", "helios"} {
-		appendLog("info", fmt.Sprintf("%s realm LDAP 페더레이션 설정 중...", realm))
-		fedID, err := createLDAPFederation(keycloakURL, token, realm, tcfg)
-		if err != nil {
-			return fmt.Errorf("create LDAP federation in %s: %w", realm, err)
-		}
-		appendLog("success", fmt.Sprintf("%s realm LDAP 페더레이션 완료 (id=%s)", realm, fedID))
-
-		// 8. Trigger fullSync
-		appendLog("info", fmt.Sprintf("%s realm LDAP 동기화 중...", realm))
-		if err := triggerLDAPSync(keycloakURL, token, realm, fedID); err != nil {
-			return fmt.Errorf("LDAP sync in %s: %w", realm, err)
-		}
-		appendLog("success", fmt.Sprintf("%s realm LDAP 동기화 완료", realm))
+	// 7. Create local admin user in admin realm (no LDAP)
+	appendLog("info", "admin realm 관리자 계정 생성 중...")
+	if err := createLocalUser(keycloakURL, token, "admin", "admin", tcfg.ConsoleAdminPassword); err != nil {
+		return fmt.Errorf("create admin user in admin realm: %w", err)
 	}
+	appendLog("success", "admin realm 관리자 계정 생성 완료 (admin)")
+
+	// 8. Create LDAP federation in helios realm only
+	appendLog("info", "helios realm LDAP 페더레이션 설정 중...")
+	fedID, err := createLDAPFederation(keycloakURL, token, "helios", tcfg)
+	if err != nil {
+		return fmt.Errorf("create LDAP federation in helios: %w", err)
+	}
+	appendLog("success", fmt.Sprintf("helios realm LDAP 페더레이션 완료 (id=%s)", fedID))
+
+	// 9. Trigger fullSync for helios realm
+	appendLog("info", "helios realm LDAP 동기화 중...")
+	if err := triggerLDAPSync(keycloakURL, token, "helios", fedID); err != nil {
+		return fmt.Errorf("LDAP sync in helios: %w", err)
+	}
+	appendLog("success", "helios realm LDAP 동기화 완료")
 
 	// 9. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")
@@ -248,6 +253,43 @@ func createConfidentialClient(baseURL, token, realm, clientID, redirectDomain, c
 	if resp.StatusCode != 201 && resp.StatusCode != 409 {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("create client %s failed (%d): %s", clientID, resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+func createLocalUser(baseURL, token, realm, username, password string) error {
+	// Create user
+	payload := map[string]interface{}{
+		"username":      username,
+		"enabled":       true,
+		"emailVerified": true,
+		"firstName":     "Admin",
+		"lastName":      "User",
+		"email":         username + "@localhost",
+		"credentials": []map[string]interface{}{
+			{
+				"type":      "password",
+				"value":     password,
+				"temporary": false,
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", baseURL+"/admin/realms/"+realm+"/users", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 && resp.StatusCode != 409 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create user %s failed (%d): %s", username, resp.StatusCode, string(respBody))
 	}
 	return nil
 }

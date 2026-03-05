@@ -1,19 +1,4 @@
-# ── Traefik ForwardAuth Middleware ──
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: polyon-auth-forward
-  namespace: {{.Namespace}}
-spec:
-  forwardAuth:
-    address: http://polyon-oauth2-proxy.{{.Namespace}}.svc.cluster.local:4180/oauth2/auth
-    trustForwardHeader: true
-    authResponseHeaders:
-      - X-Auth-Request-User
-      - X-Auth-Request-Email
-      - X-Auth-Request-Access-Token
----
-# ── Ingress: Console (with ForwardAuth) ──
+# ── Ingress: Console (oauth2-proxy as reverse proxy) ──
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -23,7 +8,6 @@ metadata:
     app.kubernetes.io/part-of: polyon
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.middlewares: {{.Namespace}}-polyon-auth-forward@kubernetescrd
 spec:
   tls:
     - hosts:
@@ -33,20 +17,13 @@ spec:
     - host: {{.ConsoleDomain}}
       http:
         paths:
-          - path: /oauth2
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: polyon-oauth2-proxy
                 port:
                   number: 4180
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: polyon-console
-                port:
-                  number: 80
 ---
 # ── Ingress: Auth (Keycloak) ──
 apiVersion: networking.k8s.io/v1
