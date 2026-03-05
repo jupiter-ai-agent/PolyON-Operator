@@ -74,8 +74,6 @@ spec:
               value: ".{{.Domain}}"
             - name: OAUTH2_PROXY_UPSTREAM
               value: "http://polyon-console.{{.Namespace}}.svc.cluster.local:80/"
-          args:
-            - "--upstream=http://polyon-console.{{.Namespace}}.svc.cluster.local:80/"
             - name: OAUTH2_PROXY_HTTP_ADDRESS
               value: "0.0.0.0:4180"
             - name: OAUTH2_PROXY_SKIP_PROVIDER_BUTTON
@@ -96,6 +94,8 @@ spec:
               value: "S256"
             - name: OAUTH2_PROXY_OIDC_EXTRA_AUDIENCES
               value: "polyon-forward-auth"
+          args:
+            - "--upstream=http://polyon-console.{{.Namespace}}.svc.cluster.local:80/"
           readinessProbe:
             httpGet:
               path: /ping
