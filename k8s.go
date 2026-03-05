@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"text/template"
@@ -34,6 +35,8 @@ type TemplateConfig struct {
 	DomainDC                string // e.g. DC=cmars,DC=com
 	CookieSecret            string // 16-byte base64 for oauth2-proxy
 	ForwardAuthClientSecret string // 32-byte hex for oauth2-proxy confidential client
+	TLSCertBase64           string // base64-encoded TLS certificate
+	TLSKeyBase64            string // base64-encoded TLS private key
 }
 
 // DomainToDC converts a domain like "cmars.com" to "DC=cmars,DC=com"
@@ -92,6 +95,15 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 	rand.Read(authSecretBytes)
 	forwardAuthSecret := hex.EncodeToString(authSecretBytes)
 
+	// Read TLS certificate and key
+	var tlsCertB64, tlsKeyB64 string
+	if certData, err := os.ReadFile("/tls/tls.crt"); err == nil {
+		tlsCertB64 = base64.StdEncoding.EncodeToString(certData)
+	}
+	if keyData, err := os.ReadFile("/tls/tls.key"); err == nil {
+		tlsKeyB64 = base64.StdEncoding.EncodeToString(keyData)
+	}
+
 	return TemplateConfig{
 		Namespace:               cfg.Namespace,
 		Domain:                  domain,
@@ -108,6 +120,8 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		DomainDC:                DomainToDC(domain),
 		CookieSecret:            cookieSecret,
 		ForwardAuthClientSecret: forwardAuthSecret,
+		TLSCertBase64:           tlsCertB64,
+		TLSKeyBase64:            tlsKeyB64,
 	}
 }
 
