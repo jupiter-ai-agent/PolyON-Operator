@@ -96,6 +96,8 @@ spec:
               else
                 echo "[PolyON] Samba AD DC already provisioned, starting..."
               fi
+              # Allow plain LDAP bind for Keycloak/Stalwart federation
+              sed -i '/\[global\]/a\\tldap server require strong auth = no' /var/lib/samba/private/smb.conf 2>/dev/null || sed -i '/\[global\]/a\\tldap server require strong auth = no' /etc/samba/smb.conf
               exec samba -F --no-process-group
           env:
             - name: SAMBA_REALM

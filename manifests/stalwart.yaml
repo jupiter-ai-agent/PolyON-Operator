@@ -57,6 +57,24 @@ spec:
       labels:
         app: polyon-mail
     spec:
+      initContainers:
+        - name: copy-config
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              if [ ! -f /opt/stalwart-mail/etc/config.toml ]; then
+                echo "[PolyON] Copying initial config.toml to PVC"
+                mkdir -p /opt/stalwart-mail/etc
+                cp /config-source/config.toml /opt/stalwart-mail/etc/config.toml
+              else
+                echo "[PolyON] config.toml already exists, skipping"
+              fi
+          volumeMounts:
+            - name: stalwart-data
+              mountPath: /opt/stalwart-mail
+            - name: config-source
+              mountPath: /config-source
       containers:
         - name: stalwart
           image: jupitertriangles/polyon-mail:v1.0.0
@@ -87,6 +105,10 @@ spec:
           volumeMounts:
             - name: stalwart-data
               mountPath: /opt/stalwart-mail
+      volumes:
+        - name: config-source
+          configMap:
+            name: polyon-mail-config
   volumeClaimTemplates:
     - metadata:
         name: stalwart-data

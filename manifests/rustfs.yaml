@@ -1,25 +1,25 @@
-# ── MinIO Secret ──
+# ── RustFS Secret ──
 apiVersion: v1
 kind: Secret
 metadata:
-  name: polyon-minio-secret
+  name: polyon-rustfs-secret
   namespace: {{.Namespace}}
   labels:
-    app: polyon-minio
+    app: polyon-rustfs
     app.kubernetes.io/part-of: polyon
 type: Opaque
 stringData:
-  MINIO_ROOT_USER: "polyon-admin"
-  MINIO_ROOT_PASSWORD: "{{.AdminPassword}}"
+  RUSTFS_ACCESS_KEY: "polyon-admin"
+  RUSTFS_SECRET_KEY: "{{.AdminPassword}}"
 ---
-# ── MinIO Service ──
+# ── RustFS Service ──
 apiVersion: v1
 kind: Service
 metadata:
-  name: polyon-minio
+  name: polyon-rustfs
   namespace: {{.Namespace}}
   labels:
-    app: polyon-minio
+    app: polyon-rustfs
     app.kubernetes.io/part-of: polyon
 spec:
   type: ClusterIP
@@ -33,47 +33,57 @@ spec:
       protocol: TCP
       name: console
   selector:
-    app: polyon-minio
+    app: polyon-rustfs
 ---
-# ── MinIO StatefulSet ──
+# ── RustFS StatefulSet ──
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: polyon-minio
+  name: polyon-rustfs
   namespace: {{.Namespace}}
   labels:
-    app: polyon-minio
+    app: polyon-rustfs
     app.kubernetes.io/part-of: polyon
 spec:
-  serviceName: polyon-minio
+  serviceName: polyon-rustfs
   replicas: 1
   selector:
     matchLabels:
-      app: polyon-minio
+      app: polyon-rustfs
   template:
     metadata:
       labels:
-        app: polyon-minio
+        app: polyon-rustfs
     spec:
+      initContainers:
+        - name: init-volume
+          image: busybox:stable
+          command: ["sh", "-c", "mkdir -p /data/vol1 && chown -R 10001:10001 /data"]
+          volumeMounts:
+            - name: rustfs-data
+              mountPath: /data
       containers:
-        - name: minio
-          image: minio/minio:latest
-          args: ["server", "/data", "--console-address", ":9001"]
+        - name: rustfs
+          image: rustfs/rustfs:1.0.0-alpha.85
+          env:
+            - name: RUSTFS_VOLUMES
+              value: "/data/vol1"
+            - name: RUSTFS_ADDRESS
+              value: ":9000"
+          envFrom:
+            - secretRef:
+                name: polyon-rustfs-secret
+          args: ["--console-address", ":9001", "/data/vol1"]
           ports:
             - containerPort: 9000
             - containerPort: 9001
-          envFrom:
-            - secretRef:
-                name: polyon-minio-secret
           readinessProbe:
-            httpGet:
-              path: /minio/health/ready
+            tcpSocket:
               port: 9000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /minio/health/live
+            tcpSocket:
               port: 9000
             initialDelaySeconds: 10
             periodSeconds: 20
@@ -85,11 +95,11 @@ spec:
               memory: 1Gi
               cpu: 500m
           volumeMounts:
-            - name: minio-data
+            - name: rustfs-data
               mountPath: /data
   volumeClaimTemplates:
     - metadata:
-        name: minio-data
+        name: rustfs-data
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:

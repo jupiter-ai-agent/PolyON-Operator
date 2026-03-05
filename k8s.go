@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"embed"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os/exec"
@@ -16,13 +19,31 @@ var manifestFS embed.FS
 
 // TemplateConfig holds all template variables for manifest rendering
 type TemplateConfig struct {
-	Namespace        string
-	Domain           string
-	DomainUpper      string // e.g. CMARS.COM
-	DomainNetBIOS    string // e.g. CMARS
-	AdminPassword    string
-	OrgName          string
-	PostgresPassword string
+	Namespace             string
+	Domain                string
+	DomainUpper           string // e.g. CMARS.COM
+	DomainNetBIOS         string // e.g. CMARS
+	AdminPassword         string
+	ConsoleAdminPassword  string // Keycloak admin password
+	OrgName               string
+	PostgresPassword      string
+	ConsoleDomain         string // e.g. console.cmars.com
+	AuthDomain            string // e.g. auth.cmars.com
+	MailDomain            string // e.g. mail.cmars.com
+	PortalDomain          string // e.g. portal.cmars.com
+	DomainDC                string // e.g. DC=cmars,DC=com
+	CookieSecret            string // 16-byte base64 for oauth2-proxy
+	ForwardAuthClientSecret string // 32-byte hex for oauth2-proxy confidential client
+}
+
+// DomainToDC converts a domain like "cmars.com" to "DC=cmars,DC=com"
+func DomainToDC(domain string) string {
+	parts := strings.Split(strings.ToLower(domain), ".")
+	dcs := make([]string, len(parts))
+	for i, p := range parts {
+		dcs[i] = "DC=" + p
+	}
+	return strings.Join(dcs, ",")
 }
 
 // NewTemplateConfig derives computed fields from SetupConfig
@@ -36,14 +57,57 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		netbios = netbios[:idx]
 	}
 
+	// Subdomain defaults
+	consoleSub := cfg.Subdomains.Console
+	if consoleSub == "" {
+		consoleSub = "console"
+	}
+	authSub := cfg.Subdomains.Auth
+	if authSub == "" {
+		authSub = "auth"
+	}
+	mailSub := cfg.Subdomains.Mail
+	if mailSub == "" {
+		mailSub = "mail"
+	}
+	portalSub := cfg.Subdomains.Portal
+	if portalSub == "" {
+		portalSub = "portal"
+	}
+
+	domainLower := strings.ToLower(domain)
+
+	consoleAdminPw := cfg.ConsoleAdminPassword
+	if consoleAdminPw == "" {
+		consoleAdminPw = cfg.AdminPassword
+	}
+
+	// Generate CookieSecret (16 bytes, base64)
+	cookieBytes := make([]byte, 16)
+	rand.Read(cookieBytes)
+	cookieSecret := base64.StdEncoding.EncodeToString(cookieBytes)
+
+	// Generate ForwardAuthClientSecret (32 bytes, hex)
+	authSecretBytes := make([]byte, 32)
+	rand.Read(authSecretBytes)
+	forwardAuthSecret := hex.EncodeToString(authSecretBytes)
+
 	return TemplateConfig{
-		Namespace:        cfg.Namespace,
-		Domain:           domain,
-		DomainUpper:      domainUpper,
-		DomainNetBIOS:    netbios,
-		AdminPassword:    cfg.AdminPassword,
-		OrgName:          cfg.OrgName,
-		PostgresPassword: cfg.AdminPassword, // reuse admin password for postgres
+		Namespace:               cfg.Namespace,
+		Domain:                  domain,
+		DomainUpper:             domainUpper,
+		DomainNetBIOS:           netbios,
+		AdminPassword:           cfg.AdminPassword,
+		ConsoleAdminPassword:    consoleAdminPw,
+		OrgName:                 cfg.OrgName,
+		PostgresPassword:        cfg.AdminPassword, // reuse admin password for postgres
+		ConsoleDomain:           consoleSub + "." + domainLower,
+		AuthDomain:              authSub + "." + domainLower,
+		MailDomain:              mailSub + "." + domainLower,
+		PortalDomain:            portalSub + "." + domainLower,
+		DomainDC:                DomainToDC(domain),
+		CookieSecret:            cookieSecret,
+		ForwardAuthClientSecret: forwardAuthSecret,
 	}
 }
 

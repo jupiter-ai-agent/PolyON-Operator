@@ -1,0 +1,95 @@
+# ── OAuth2 Proxy Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-oauth2-proxy
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-oauth2-proxy
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4180
+      targetPort: 4180
+      protocol: TCP
+      name: http
+  selector:
+    app: polyon-oauth2-proxy
+---
+# ── OAuth2 Proxy Deployment ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-oauth2-proxy
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-oauth2-proxy
+    app.kubernetes.io/part-of: polyon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: polyon-oauth2-proxy
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+          ports:
+            - containerPort: 4180
+          env:
+            - name: OAUTH2_PROXY_PROVIDER
+              value: keycloak-oidc
+            - name: OAUTH2_PROXY_CLIENT_ID
+              value: polyon-forward-auth
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              value: "{{.ForwardAuthClientSecret}}"
+            - name: OAUTH2_PROXY_REDIRECT_URL
+              value: "https://{{.ConsoleDomain}}/oauth2/callback"
+            - name: OAUTH2_PROXY_OIDC_ISSUER_URL
+              value: "http://polyon-auth:8080/realms/admin"
+            - name: OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION
+              value: "true"
+            - name: OAUTH2_PROXY_EMAIL_DOMAINS
+              value: "*"
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              value: "{{.CookieSecret}}"
+            - name: OAUTH2_PROXY_COOKIE_SECURE
+              value: "true"
+            - name: OAUTH2_PROXY_COOKIE_DOMAINS
+              value: ".{{.Domain}}"
+            - name: OAUTH2_PROXY_WHITELIST_DOMAINS
+              value: ".{{.Domain}}"
+            - name: OAUTH2_PROXY_UPSTREAM
+              value: "static://200"
+            - name: OAUTH2_PROXY_HTTP_ADDRESS
+              value: "0.0.0.0:4180"
+            - name: OAUTH2_PROXY_SKIP_PROVIDER_BUTTON
+              value: "true"
+            - name: OAUTH2_PROXY_SSL_INSECURE_SKIP_VERIFY
+              value: "true"
+            - name: OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL
+              value: "true"
+            - name: OAUTH2_PROXY_PASS_ACCESS_TOKEN
+              value: "true"
+            - name: OAUTH2_PROXY_SET_XAUTHREQUEST
+              value: "true"
+            - name: OAUTH2_PROXY_CODE_CHALLENGE_METHOD
+              value: S256
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 50m
+            limits:
+              memory: 128Mi
+              cpu: 200m

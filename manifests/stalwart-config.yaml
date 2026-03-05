@@ -1,0 +1,67 @@
+# ── Stalwart Mail ConfigMap ──
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polyon-mail-config
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-mail
+    app.kubernetes.io/part-of: polyon
+data:
+  config.toml: |
+    [server]
+    hostname = "{{.MailDomain}}"
+
+    [server.listener.smtp]
+    bind = "[::]:25"
+    protocol = "smtp"
+
+    [server.listener.submission]
+    bind = "[::]:587"
+    protocol = "smtp"
+
+    [server.listener.imaps]
+    bind = "[::]:993"
+    protocol = "imap"
+    tls.implicit = true
+
+    [server.listener.sieve]
+    bind = "[::]:4190"
+    protocol = "managesieve"
+
+    [storage]
+    data = "rocksdb"
+    fts = "opensearch"
+    blob = "rocksdb"
+    lookup = "rocksdb"
+    directory = "ldap"
+
+    [store.rocksdb]
+    type = "rocksdb"
+    path = "/opt/stalwart-mail/data"
+
+    [store.opensearch]
+    type = "elasticsearch"
+    url = "http://polyon-search:9200"
+
+    [directory.ldap]
+    type = "ldap"
+    url = "ldap://polyon-dc:389"
+    base-dn = "{{.DomainDC}}"
+
+    [directory.ldap.bind]
+    dn = "CN=Administrator,CN=Users,{{.DomainDC}}"
+    secret = "{{.AdminPassword}}"
+
+    [directory.ldap.filter]
+    name = "(&(objectClass=user)(sAMAccountName=?))"
+    email = "(&(objectClass=user)(|(mail=?)(userPrincipalName=?)))"
+
+    [directory.ldap.attributes]
+    name = "sAMAccountName"
+    email = "mail"
+    description = "displayName"
+
+    [authentication.fallback-admin]
+    user = "admin"
+    secret = "{{.AdminPassword}}"

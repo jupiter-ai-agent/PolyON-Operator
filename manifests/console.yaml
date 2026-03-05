@@ -1,0 +1,56 @@
+# ── Console UI Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-console
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-console
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: polyon-console
+---
+# ── Console UI Deployment ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-console
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-console
+    app.kubernetes.io/part-of: polyon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-console
+  template:
+    metadata:
+      labels:
+        app: polyon-console
+    spec:
+      containers:
+        - name: console
+          image: jupitertriangles/polyon-ui:v1.0.0
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 50m
+            limits:
+              memory: 128Mi
+              cpu: 200m

@@ -28,14 +28,23 @@ type serviceStep struct {
 //go:embed wizard.html
 var wizardHTML embed.FS
 
+// SubdomainConfig holds subdomain prefix overrides
+type SubdomainConfig struct {
+	Console string `json:"console"` // default: "console"
+	Auth    string `json:"auth"`    // default: "auth"
+	Mail    string `json:"mail"`    // default: "mail"
+	Portal  string `json:"portal"`  // default: "portal"
+}
+
 // SetupConfig holds the wizard form data
 type SetupConfig struct {
-	Namespace     string   `json:"namespace"`
-	Domain        string   `json:"domain"`
-	AdminPassword string   `json:"adminPassword"`
-	OrgName       string   `json:"orgName"`
-	Phase         string   `json:"phase"` // infra, services, apps
-	Apps          []string `json:"apps"`
+	Namespace          string          `json:"namespace"`
+	Domain             string          `json:"domain"`
+	AdminPassword      string          `json:"adminPassword"`
+	ConsoleAdminPassword string        `json:"consoleAdminPassword"`
+	OrgName            string          `json:"orgName"`
+	Phase              string          `json:"phase"` // infra, services
+	Subdomains         SubdomainConfig `json:"subdomains"`
 }
 
 // SetupProgress tracks installation progress
@@ -49,18 +58,49 @@ type SetupProgress struct {
 }
 
 type StepStatus struct {
-	Name   string `json:"name"`
-	Status string `json:"status"` // pending, running, done, error
+	Name      string `json:"name"`
+	Status    string `json:"status"` // pending, running, done, error
+	StartedAt int64  `json:"startedAt,omitempty"`
+	DoneAt    int64  `json:"doneAt,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// LogEntry represents a single log message
+type LogEntry struct {
+	Time    int64  `json:"time"`
+	Level   string `json:"level"` // info, error, success
+	Message string `json:"message"`
 }
 
 var (
 	progress SetupProgress
 	config   SetupConfig
 	mu       sync.Mutex
+
+	logBuffer []LogEntry
+	logMu     sync.Mutex
 )
+
+const maxLogLines = 100
+
+func appendLog(level, message string) {
+	logMu.Lock()
+	defer logMu.Unlock()
+	entry := LogEntry{
+		Time:    time.Now().UnixMilli(),
+		Level:   level,
+		Message: message,
+	}
+	logBuffer = append(logBuffer, entry)
+	if len(logBuffer) > maxLogLines {
+		logBuffer = logBuffer[len(logBuffer)-maxLogLines:]
+	}
+	log.Printf("[%s] %s", level, message)
+}
 
 func init() {
 	progress = SetupProgress{State: "fresh"}
+	logBuffer = make([]LogEntry, 0, maxLogLines)
 }
 
 func main() {
@@ -94,6 +134,14 @@ func main() {
 		json.NewEncoder(w).Encode(progress)
 	})
 
+	// Get logs
+	http.HandleFunc("/api/logs", func(w http.ResponseWriter, r *http.Request) {
+		logMu.Lock()
+		defer logMu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(logBuffer)
+	})
+
 	// Start setup phase
 	http.HandleFunc("/api/setup", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -123,8 +171,6 @@ func main() {
 			go runInfraSetup(cfg)
 		case "services":
 			go runServicesSetup(cfg)
-		case "apps":
-			go runAppsSetup(cfg)
 		default:
 			mu.Lock()
 			progress.State = "error"
@@ -136,7 +182,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"status": "started", "phase": cfg.Phase})
 	})
 
-	log.Printf("PolyON Operator v0.1.0 starting on :%s", port)
+	log.Printf("PolyON Operator v0.4.0 starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
@@ -144,15 +190,15 @@ func runInfraSetup(cfg SetupConfig) {
 	steps := []StepStatus{
 		{Name: "PostgreSQL (Database)", Status: "pending"},
 		{Name: "Redis (Cache)", Status: "pending"},
-		{Name: "Elasticsearch (Search)", Status: "pending"},
-		{Name: "MinIO (Object Storage)", Status: "pending"},
+		{Name: "OpenSearch (Search)", Status: "pending"},
+		{Name: "RustFS (Object Storage)", Status: "pending"},
 	}
 
 	deploys := []infraStep{
 		{manifest: "postgresql.yaml", labelSelector: "app=polyon-db", timeout: 120 * time.Second},
 		{manifest: "redis.yaml", labelSelector: "app=polyon-redis", timeout: 60 * time.Second},
-		{manifest: "elasticsearch.yaml", labelSelector: "app=polyon-es", timeout: 180 * time.Second},
-		{manifest: "minio.yaml", labelSelector: "app=polyon-minio", timeout: 120 * time.Second},
+		{manifest: "opensearch.yaml", labelSelector: "app=polyon-search", timeout: 180 * time.Second},
+		{manifest: "rustfs.yaml", labelSelector: "app=polyon-rustfs", timeout: 120 * time.Second},
 	}
 
 	mu.Lock()
@@ -163,7 +209,7 @@ func runInfraSetup(cfg SetupConfig) {
 
 	tcfg := NewTemplateConfig(cfg)
 
-	log.Printf("[INFRA] Starting infrastructure setup: ns=%s domain=%s", cfg.Namespace, cfg.Domain)
+	appendLog("info", fmt.Sprintf("인프라 설치 시작: ns=%s domain=%s", cfg.Namespace, cfg.Domain))
 
 	// Create namespace first
 	if err := ensureNamespace(tcfg); err != nil {
@@ -171,32 +217,40 @@ func runInfraSetup(cfg SetupConfig) {
 		progress.State = "error"
 		progress.Message = "네임스페이스 생성 실패: " + err.Error()
 		mu.Unlock()
-		log.Printf("[INFRA] Namespace creation failed: %v", err)
+		appendLog("error", "네임스페이스 생성 실패: "+err.Error())
 		return
 	}
+	appendLog("success", "네임스페이스 생성 완료")
 
 	for i := range steps {
+		now := time.Now().UnixMilli()
 		mu.Lock()
 		progress.Step = i + 1
 		progress.Message = steps[i].Name + " 설치 중..."
 		progress.Steps[i].Status = "running"
+		progress.Steps[i].StartedAt = now
 		mu.Unlock()
 
-		log.Printf("[INFRA] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
+		appendLog("info", fmt.Sprintf("[%d/%d] %s 설치 중...", i+1, len(steps), steps[i].Name))
 
 		if err := deployManifest(deploys[i].manifest, deploys[i].labelSelector, tcfg, deploys[i].timeout); err != nil {
 			mu.Lock()
 			progress.Steps[i].Status = "error"
+			progress.Steps[i].Error = err.Error()
 			progress.State = "error"
 			progress.Message = steps[i].Name + " 설치 실패: " + err.Error()
 			mu.Unlock()
-			log.Printf("[INFRA] Failed to install %s: %v", steps[i].Name, err)
+			appendLog("error", steps[i].Name+" 설치 실패: "+err.Error())
 			return
 		}
 
+		doneAt := time.Now().UnixMilli()
 		mu.Lock()
 		progress.Steps[i].Status = "done"
+		progress.Steps[i].DoneAt = doneAt
 		mu.Unlock()
+		elapsed := (doneAt - now) / 1000
+		appendLog("success", fmt.Sprintf("%s 설치 완료 (%ds)", steps[i].Name, elapsed))
 	}
 
 	mu.Lock()
@@ -204,7 +258,7 @@ func runInfraSetup(cfg SetupConfig) {
 	progress.Message = "인프라 설치 완료"
 	mu.Unlock()
 
-	log.Printf("[INFRA] Infrastructure setup complete")
+	appendLog("success", "인프라 설치 완료")
 }
 
 func runServicesSetup(cfg SetupConfig) {
@@ -212,11 +266,16 @@ func runServicesSetup(cfg SetupConfig) {
 		{Name: "Samba AD DC (Active Directory)", Status: "pending"},
 		{Name: "Keycloak (SSO / 인증)", Status: "pending"},
 		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
+		{Name: "OAuth2 Proxy (인증 게이트웨이)", Status: "pending"},
+		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"},
+		{Name: "Console 배포", Status: "pending"},
+		{Name: "Ingress 설정", Status: "pending"},
 	}
 
 	deploys := []serviceStep{
 		{manifest: "samba-dc.yaml", labelSelector: "app=polyon-dc", timeout: 180 * time.Second},
 		{manifest: "keycloak.yaml", labelSelector: "app=polyon-auth", timeout: 180 * time.Second},
+		{manifest: "stalwart-config.yaml", labelSelector: "", timeout: 0},
 		{manifest: "stalwart.yaml", labelSelector: "app=polyon-mail", timeout: 120 * time.Second},
 	}
 
@@ -229,48 +288,128 @@ func runServicesSetup(cfg SetupConfig) {
 
 	tcfg := NewTemplateConfig(cfg)
 
-	log.Printf("[SERVICES] Starting services setup: domain=%s", cfg.Domain)
+	appendLog("info", fmt.Sprintf("서비스 설치 시작: domain=%s", cfg.Domain))
 
-	for i := range steps {
+	// Deploy core services (samba, keycloak, stalwart-config + stalwart)
+	serviceNames := []string{
+		"Samba AD DC (Active Directory)",
+		"Keycloak (SSO / 인증)",
+		"Stalwart Mail (메일 서버)",
+	}
+	for i, deploy := range deploys {
+		stepIdx := i
+		if i == 2 {
+			appendLog("info", "Stalwart 설정(ConfigMap) 배포 중...")
+			if err := deployManifest(deploy.manifest, deploy.labelSelector, tcfg, deploy.timeout); err != nil {
+				mu.Lock()
+				progress.Steps[2].Status = "error"
+				progress.Steps[2].Error = err.Error()
+				progress.State = "error"
+				progress.Message = "Stalwart 설정 실패: " + err.Error()
+				mu.Unlock()
+				appendLog("error", "Stalwart 설정 실패: "+err.Error())
+				return
+			}
+			continue
+		}
+		if i == 3 {
+			stepIdx = 2
+		}
+
+		now := time.Now().UnixMilli()
 		mu.Lock()
-		progress.Step = i + 1
-		progress.Message = steps[i].Name + " 설치 중..."
-		progress.Steps[i].Status = "running"
+		progress.Step = stepIdx + 1
+		progress.Message = serviceNames[stepIdx] + " 설치 중..."
+		progress.Steps[stepIdx].Status = "running"
+		progress.Steps[stepIdx].StartedAt = now
 		mu.Unlock()
 
-		log.Printf("[SERVICES] [%d/%d] Installing %s", i+1, len(steps), steps[i].Name)
+		appendLog("info", fmt.Sprintf("[%d/3] %s 설치 중...", stepIdx+1, serviceNames[stepIdx]))
 
-		if err := deployManifest(deploys[i].manifest, deploys[i].labelSelector, tcfg, deploys[i].timeout); err != nil {
+		if err := deployManifest(deploy.manifest, deploy.labelSelector, tcfg, deploy.timeout); err != nil {
 			mu.Lock()
-			progress.Steps[i].Status = "error"
+			progress.Steps[stepIdx].Status = "error"
+			progress.Steps[stepIdx].Error = err.Error()
 			progress.State = "error"
-			progress.Message = steps[i].Name + " 설치 실패: " + err.Error()
+			progress.Message = serviceNames[stepIdx] + " 설치 실패: " + err.Error()
 			mu.Unlock()
-			log.Printf("[SERVICES] Failed to install %s: %v", steps[i].Name, err)
+			appendLog("error", serviceNames[stepIdx]+" 설치 실패: "+err.Error())
 			return
 		}
 
+		doneAt := time.Now().UnixMilli()
 		mu.Lock()
-		progress.Steps[i].Status = "done"
+		progress.Steps[stepIdx].Status = "done"
+		progress.Steps[stepIdx].DoneAt = doneAt
 		mu.Unlock()
+		elapsed := (doneAt - now) / 1000
+		appendLog("success", fmt.Sprintf("%s 설치 완료 (%ds)", serviceNames[stepIdx], elapsed))
 	}
 
+	// Provisioning phase (must run before OAuth2 Proxy — realm must exist for OIDC discovery)
+	provNow := time.Now().UnixMilli()
 	mu.Lock()
-	progress.State = "phase_done"
-	progress.Message = "서비스 설치 완료"
+	progress.Step = 4
+	progress.Message = "Keycloak 프로비저닝 (Realm, Client, LDAP) 진행 중..."
+	progress.Steps[3].Status = "running"
+	progress.Steps[3].StartedAt = provNow
 	mu.Unlock()
 
-	log.Printf("[SERVICES] Services setup complete")
-}
+	appendLog("info", "Keycloak 프로비저닝 시작...")
+	if err := runProvisioning(cfg, tcfg); err != nil {
+		mu.Lock()
+		progress.Steps[3].Status = "error"
+		progress.Steps[3].Error = err.Error()
+		progress.State = "error"
+		progress.Message = "프로비저닝 실패: " + err.Error()
+		mu.Unlock()
+		appendLog("error", "프로비저닝 실패: "+err.Error())
+		return
+	}
 
-func runAppsSetup(cfg SetupConfig) {
-	log.Printf("[APPS] Installing apps: %v", cfg.Apps)
-
+	provDone := time.Now().UnixMilli()
+	provElapsed := (provDone - provNow) / 1000
 	mu.Lock()
-	progress.State = "running"
-	progress.Message = "앱 설치 완료"
-	progress.Phase = "complete"
+	progress.Steps[3].Status = "done"
+	progress.Steps[3].DoneAt = provDone
 	mu.Unlock()
+	appendLog("success", fmt.Sprintf("프로비저닝 완료 (%ds)", provElapsed))
 
-	log.Printf("[APPS] Setup fully complete. Domain=%s NS=%s", cfg.Domain, cfg.Namespace)
+	// Deploy OAuth2 Proxy (after provisioning — needs admin realm for OIDC discovery)
+	{
+		oauthNow := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Step = 5
+		progress.Message = "OAuth2 Proxy (인증 게이트웨이) 설치 중..."
+		progress.Steps[4].Status = "running"
+		progress.Steps[4].StartedAt = oauthNow
+		mu.Unlock()
+
+		appendLog("info", "OAuth2 Proxy 설치 중...")
+		if err := deployManifest("oauth2-proxy.yaml", "app=polyon-oauth2-proxy", tcfg, 120*time.Second); err != nil {
+			mu.Lock()
+			progress.Steps[4].Status = "error"
+			progress.Steps[4].Error = err.Error()
+			progress.State = "error"
+			progress.Message = "OAuth2 Proxy 설치 실패: " + err.Error()
+			mu.Unlock()
+			appendLog("error", "OAuth2 Proxy 설치 실패: "+err.Error())
+			return
+		}
+
+		oauthDone := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Steps[4].Status = "done"
+		progress.Steps[4].DoneAt = oauthDone
+		progress.Steps[5].Status = "done"
+		progress.Steps[5].DoneAt = oauthDone
+		progress.Steps[6].Status = "done"
+		progress.Steps[6].DoneAt = oauthDone
+		progress.State = "phase_done"
+		progress.Message = "서비스 설치 완료"
+		mu.Unlock()
+		appendLog("success", fmt.Sprintf("OAuth2 Proxy 설치 완료 (%ds)", (oauthDone-oauthNow)/1000))
+	}
+
+	appendLog("success", "서비스 설치 완료 — 모든 구성 요소가 배포되었습니다")
 }

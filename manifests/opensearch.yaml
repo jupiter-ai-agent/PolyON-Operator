@@ -1,0 +1,81 @@
+# ── OpenSearch Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-search
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-search
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: http
+    - port: 9600
+      targetPort: 9600
+      protocol: TCP
+      name: performance
+  selector:
+    app: polyon-search
+---
+# ── OpenSearch StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-search
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-search
+    app.kubernetes.io/part-of: polyon
+spec:
+  serviceName: polyon-search
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-search
+  template:
+    metadata:
+      labels:
+        app: polyon-search
+    spec:
+      containers:
+        - name: opensearch
+          image: opensearchproject/opensearch:3.5.0
+          ports:
+            - containerPort: 9200
+            - containerPort: 9600
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: DISABLE_SECURITY_PLUGIN
+              value: "true"
+            - name: OPENSEARCH_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 2Gi
+              cpu: 1000m
+          volumeMounts:
+            - name: search-data
+              mountPath: /usr/share/opensearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: search-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

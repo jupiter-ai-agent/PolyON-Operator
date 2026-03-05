@@ -14,7 +14,7 @@
     --text: #f4f4f4;
     --text-secondary: #c6c6c6;
     --border: #525252;
-    --success: #42be65;
+    --success: #24a148;
     --running: #4589ff;
     --error: #da1e28;
     --pending: #6f6f6f;
@@ -29,7 +29,7 @@
     align-items: center;
     justify-content: center;
   }
-  .container { width: 100%; max-width: 600px; padding: 2rem; }
+  .container { width: 100%; max-width: 640px; padding: 2rem; }
   .logo { text-align: center; margin-bottom: 2rem; }
   .logo h1 { font-size: 2rem; font-weight: 600; letter-spacing: -0.5px; }
   .logo h1 span { color: var(--primary); }
@@ -44,7 +44,7 @@
     font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; margin-right: 0.5rem;
   }
 
-  /* Stepper */
+  /* Stepper — 4 steps now */
   .stepper { display: flex; justify-content: center; margin-bottom: 2rem; gap: 0; }
   .stepper-item {
     display: flex; align-items: center; font-size: 0.75rem; color: var(--pending);
@@ -55,7 +55,7 @@
     border: 2px solid var(--pending); margin: 0 4px; font-size: 0.75rem;
   }
   .stepper-item.active .stepper-dot { border-color: var(--primary); color: var(--primary); }
-  .stepper-item.done .stepper-dot { background: var(--success); border-color: var(--success); color: #000; }
+  .stepper-item.done .stepper-dot { background: var(--success); border-color: var(--success); color: #fff; }
   .stepper-line { width: 32px; height: 2px; background: var(--pending); margin-top: 1px; }
   .stepper-line.done { background: var(--success); }
 
@@ -74,24 +74,28 @@
   .field input:focus { border-color: var(--primary); }
   .field .hint { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
 
-  /* App selection */
-  .app-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .app-item {
-    display: flex; align-items: center; padding: 0.75rem 1rem;
-    background: var(--bg-input); border: 1px solid var(--border);
-    border-radius: 4px; cursor: pointer; transition: border-color 0.15s;
+  /* Password field wrapper */
+  .pw-wrapper {
+    position: relative;
   }
-  .app-item:hover { border-color: var(--text-secondary); }
-  .app-item.selected { border-color: var(--primary); background: #0f62fe20; }
-  .app-item input[type=checkbox] { margin-right: 0.75rem; accent-color: var(--primary); }
-  .app-item .app-name { font-size: 0.875rem; }
-  .app-item .app-desc { font-size: 0.7rem; color: var(--text-secondary); }
+  .pw-wrapper input {
+    padding-right: 2.75rem;
+  }
+  .pw-toggle {
+    position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--pending); transition: color 0.15s;
+  }
+  .pw-toggle:hover { color: var(--text-secondary); }
+  .pw-toggle svg { width: 18px; height: 18px; }
 
   /* Buttons */
   .btn-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
   .btn {
     flex: 1; padding: 0.875rem; border: none; border-radius: 4px;
     font-size: 0.875rem; font-weight: 500; cursor: pointer; letter-spacing: 0.16px;
+    transition: background 0.15s;
   }
   .btn-primary { background: var(--primary); color: #fff; }
   .btn-primary:hover { background: var(--primary-hover); }
@@ -99,29 +103,81 @@
   .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
   .btn-secondary:hover { background: #393939; }
 
-  /* Progress */
+  /* Progress step list */
   .step-list { list-style: none; margin-bottom: 1rem; }
   .step-list li {
     display: flex; align-items: center; padding: 0.625rem 0;
     border-bottom: 1px solid #393939; font-size: 0.875rem;
+    transition: opacity 0.3s, background 0.3s;
   }
   .step-list li:last-child { border-bottom: none; }
+  .step-list li.step-active { background: rgba(15,98,254,0.06); border-radius: 4px; padding-left: 0.5rem; }
+  .step-name { flex: 1; }
+  .step-time { font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem; white-space: nowrap; }
+  .step-time.success { color: var(--success); }
+  .step-time.error { color: var(--error); }
+
   .step-icon {
     width: 20px; height: 20px; border-radius: 50%; margin-right: 0.75rem;
     flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 0.625rem;
+    font-size: 0.625rem; transition: all 0.3s;
   }
   .step-icon.pending { border: 2px solid var(--pending); }
   .step-icon.running { border: 2px solid var(--running); animation: pulse 1.5s infinite; }
   .step-icon.done { background: var(--success); }
-  .step-icon.done::after { content: "✓"; color: #000; font-weight: bold; }
+  .step-icon.done svg { display: block; }
   .step-icon.error { background: var(--error); }
-  .step-icon.error::after { content: "✕"; color: #fff; font-weight: bold; }
+
+  /* Overall progress bar */
+  .progress-bar-wrapper {
+    background: #393939; border-radius: 4px; height: 6px; margin-bottom: 1rem; overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%; background: var(--primary); border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .progress-summary {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;
+  }
+
+  /* Log area */
+  .log-area {
+    background: #1a1a1a; border: 1px solid #333; border-radius: 4px;
+    max-height: 160px; overflow-y: auto; padding: 0.5rem 0.75rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem;
+    line-height: 1.6; margin-top: 1rem; scroll-behavior: smooth;
+  }
+  .log-area::-webkit-scrollbar { width: 6px; }
+  .log-area::-webkit-scrollbar-track { background: transparent; }
+  .log-area::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  .log-line { animation: fadeIn 0.3s ease; }
+  .log-line.info { color: var(--text-secondary); }
+  .log-line.success { color: var(--success); }
+  .log-line.error { color: var(--error); }
+  .log-label { font-weight: 600; margin-right: 0.25rem; }
+
   .status-msg { text-align: center; color: var(--text-secondary); font-size: 0.875rem; margin-top: 1rem; }
   .status-msg.complete { color: var(--success); font-weight: 600; }
 
+  /* Final screen */
+  .final-icon {
+    width: 64px; height: 64px; margin: 0 auto 1rem; border-radius: 50%;
+    background: var(--success); display: flex; align-items: center; justify-content: center;
+  }
+  .final-icon svg { width: 32px; height: 32px; color: #fff; }
+  .final-url {
+    background: #1a1a1a; border: 1px solid #333; border-radius: 4px;
+    padding: 0.75rem 1rem; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem; color: var(--text-secondary); word-break: break-all;
+    margin: 1rem 0;
+  }
+
   .hidden { display: none !important; }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
+  @keyframes slideIn { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+  .animate-in { animation: slideIn 0.4s ease; }
 </style>
 </head>
 <body>
@@ -131,7 +187,7 @@
     <p>Setup Wizard</p>
   </div>
 
-  <!-- Stepper -->
+  <!-- Stepper: 4 steps -->
   <div class="stepper" id="stepper">
     <div class="stepper-item active" data-step="1"><div class="stepper-dot">1</div></div>
     <div class="stepper-line"></div>
@@ -140,12 +196,10 @@
     <div class="stepper-item" data-step="3"><div class="stepper-dot">3</div></div>
     <div class="stepper-line"></div>
     <div class="stepper-item" data-step="4"><div class="stepper-dot">4</div></div>
-    <div class="stepper-line"></div>
-    <div class="stepper-item" data-step="5"><div class="stepper-dot">5</div></div>
   </div>
 
   <!-- Step 1: 기본 설정 -->
-  <div class="card step-card" id="step-1">
+  <div class="card step-card animate-in" id="step-1">
     <div class="card-header"><span class="step-badge">Step 1</span>기본 설정</div>
     <div class="field">
       <label>Namespace</label>
@@ -162,91 +216,145 @@
       <input type="text" id="orgName" placeholder="회사/조직 이름">
     </div>
     <div class="field">
-      <label>Administrator Password</label>
-      <input type="password" id="adminPassword" placeholder="8자 이상">
-      <div class="hint">도메인 관리자 비밀번호</div>
+      <label>Admin 비밀번호</label>
+      <div class="pw-wrapper">
+        <input type="password" id="adminPassword" placeholder="8자 이상">
+        <button type="button" class="pw-toggle" onclick="togglePw(this)" aria-label="비밀번호 표시">
+          <svg class="eye-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 6C6 6 2 16 2 16s4 10 14 10 14-10 14-10S26 6 16 6z"/>
+            <circle cx="16" cy="16" r="5"/>
+          </svg>
+          <svg class="eye-off-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <path d="M16 6C6 6 2 16 2 16s4 10 14 10 14-10 14-10S26 6 16 6z"/>
+            <circle cx="16" cy="16" r="5"/>
+            <line x1="4" y1="4" x2="28" y2="28" stroke-width="2.5"/>
+          </svg>
+        </button>
+      </div>
+      <div class="hint">도메인(DC) 관리자 비밀번호</div>
     </div>
+    <div class="field">
+      <label>Console Admin 비밀번호</label>
+      <div class="pw-wrapper">
+        <input type="password" id="consoleAdminPassword" placeholder="8자 이상">
+        <button type="button" class="pw-toggle" onclick="togglePw(this)" aria-label="비밀번호 표시">
+          <svg class="eye-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M16 6C6 6 2 16 2 16s4 10 14 10 14-10 14-10S26 6 16 6z"/>
+            <circle cx="16" cy="16" r="5"/>
+          </svg>
+          <svg class="eye-off-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+            <path d="M16 6C6 6 2 16 2 16s4 10 14 10 14-10 14-10S26 6 16 6z"/>
+            <circle cx="16" cy="16" r="5"/>
+            <line x1="4" y1="4" x2="28" y2="28" stroke-width="2.5"/>
+          </svg>
+        </button>
+      </div>
+      <div class="hint">Keycloak 관리자 로그인에 사용됩니다</div>
+    </div>
+
+    <!-- 서브도메인 설정 -->
+    <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #393939;">
+      <div style="font-size:0.75rem; font-weight:500; color:var(--text-secondary); margin-bottom:1rem; text-transform:uppercase; letter-spacing:0.32px;">서브도메인 설정</div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Console</label>
+        <div style="display:flex; align-items:center; gap:0;">
+          <input type="text" id="sub-console" value="console" placeholder="console" style="border-radius:4px 0 0 4px; border-right:none;">
+          <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Auth (Keycloak)</label>
+        <div style="display:flex; align-items:center; gap:0;">
+          <input type="text" id="sub-auth" value="auth" placeholder="auth" style="border-radius:4px 0 0 4px; border-right:none;">
+          <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Mail</label>
+        <div style="display:flex; align-items:center; gap:0;">
+          <input type="text" id="sub-mail" value="mail" placeholder="mail" style="border-radius:4px 0 0 4px; border-right:none;">
+          <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Portal</label>
+        <div style="display:flex; align-items:center; gap:0;">
+          <input type="text" id="sub-portal" value="portal" placeholder="portal" style="border-radius:4px 0 0 4px; border-right:none;">
+          <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
+        </div>
+      </div>
+    </div>
+
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="goToStep(2)">다음 →</button>
+      <button class="btn btn-primary" onclick="goToStep(2)">다음</button>
     </div>
   </div>
 
   <!-- Step 2: 인프라 설치 -->
   <div class="card step-card hidden" id="step-2">
     <div class="card-header"><span class="step-badge">Step 2</span>인프라 설치</div>
+    <div class="progress-summary" id="infra-summary">
+      <span id="infra-progress-text">0/4 완료</span>
+      <span id="infra-elapsed"></span>
+    </div>
+    <div class="progress-bar-wrapper">
+      <div class="progress-bar-fill" id="infra-bar" style="width:0%"></div>
+    </div>
     <ul class="step-list" id="infra-steps">
-      <li><div class="step-icon pending"></div>PostgreSQL (Database)</li>
-      <li><div class="step-icon pending"></div>Redis (Cache)</li>
-      <li><div class="step-icon pending"></div>Elasticsearch (Search)</li>
-      <li><div class="step-icon pending"></div>MinIO (Object Storage)</li>
+      <li><div class="step-icon pending"></div><span class="step-name">PostgreSQL (Database)</span><span class="step-time" data-step="0"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Redis (Cache)</span><span class="step-time" data-step="1"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">OpenSearch (Search)</span><span class="step-time" data-step="2"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">RustFS (Object Storage)</span><span class="step-time" data-step="3"></span></li>
     </ul>
+    <div class="log-area hidden" id="infra-log"></div>
     <div class="status-msg" id="infra-status">설치 시작 대기 중...</div>
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goToStep(1)">← 이전</button>
+      <button class="btn btn-secondary" onclick="goToStep(1)">이전</button>
       <button class="btn btn-primary" id="infra-start-btn" onclick="startInfra()">설치 시작</button>
     </div>
   </div>
 
-  <!-- Step 3: 서비스 설치 -->
+  <!-- Step 3: 서비스 설치 + 프로비저닝 -->
   <div class="card step-card hidden" id="step-3">
-    <div class="card-header"><span class="step-badge">Step 3</span>서비스 설치</div>
+    <div class="card-header"><span class="step-badge">Step 3</span>서비스 설치 + 프로비저닝</div>
+    <div class="progress-summary" id="svc-summary">
+      <span id="svc-progress-text">0/6 완료</span>
+      <span id="svc-elapsed"></span>
+    </div>
+    <div class="progress-bar-wrapper">
+      <div class="progress-bar-fill" id="svc-bar" style="width:0%"></div>
+    </div>
     <ul class="step-list" id="service-steps">
-      <li><div class="step-icon pending"></div>Samba AD DC (Active Directory)</li>
-      <li><div class="step-icon pending"></div>Keycloak (SSO / 인증)</li>
-      <li><div class="step-icon pending"></div>Stalwart Mail (메일 서버)</li>
+      <li><div class="step-icon pending"></div><span class="step-name">Samba AD DC (Active Directory)</span><span class="step-time" data-step="0"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Keycloak (SSO / 인증)</span><span class="step-time" data-step="1"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Stalwart Mail (메일 서버)</span><span class="step-time" data-step="2"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Keycloak 프로비저닝 (Realm, Client, LDAP)</span><span class="step-time" data-step="3"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Console 배포</span><span class="step-time" data-step="4"></span></li>
+      <li><div class="step-icon pending"></div><span class="step-name">Ingress 설정</span><span class="step-time" data-step="5"></span></li>
     </ul>
+    <div class="log-area hidden" id="svc-log"></div>
     <div class="status-msg" id="service-status">인프라 설치 완료 후 자동 진행...</div>
   </div>
 
-  <!-- Step 4: 앱 선택 -->
+  <!-- Step 4: 설치 완료 -->
   <div class="card step-card hidden" id="step-4">
-    <div class="card-header"><span class="step-badge">Step 4</span>앱 선택</div>
-    <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">설치할 앱을 선택하세요.</p>
-    <div class="app-grid">
-      <label class="app-item selected" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="chat" checked>
-        <div><div class="app-name">Chat</div><div class="app-desc">팀 메신저</div></div>
-      </label>
-      <label class="app-item selected" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="wiki" checked>
-        <div><div class="app-name">Wiki</div><div class="app-desc">지식 관리</div></div>
-      </label>
-      <label class="app-item" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="bpmn">
-        <div><div class="app-name">BPM</div><div class="app-desc">업무 프로세스</div></div>
-      </label>
-      <label class="app-item" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="ai">
-        <div><div class="app-name">AI Agent</div><div class="app-desc">AI 어시스턴트</div></div>
-      </label>
-      <label class="app-item" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="monitoring">
-        <div><div class="app-name">Monitoring</div><div class="app-desc">시스템 모니터링</div></div>
-      </label>
-      <label class="app-item" onclick="this.classList.toggle('selected')">
-        <input type="checkbox" value="automation">
-        <div><div class="app-name">Automation</div><div class="app-desc">워크플로 자동화</div></div>
-      </label>
-    </div>
-    <div class="btn-row">
-      <button class="btn btn-primary" id="apps-install-btn" onclick="startApps()">선택한 앱 설치 →</button>
-    </div>
-  </div>
-
-  <!-- Step 5: 완료 -->
-  <div class="card step-card hidden" id="step-5">
-    <div class="card-header"><span class="step-badge">Step 5</span>설치 완료</div>
-    <div style="text-align:center; padding:2rem 0;">
-      <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+    <div class="card-header"><span class="step-badge">완료</span>설치 완료</div>
+    <div style="text-align:center; padding:2rem 0;" class="animate-in">
+      <div class="final-icon">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="8 16 14 22 24 10"/>
+        </svg>
+      </div>
       <h2 style="font-size:1.25rem; margin-bottom:0.5rem;">PolyON 설치가 완료되었습니다</h2>
       <p style="color:var(--text-secondary); font-size:0.875rem; margin-bottom:0.25rem;">
         Domain: <strong id="final-domain"></strong>
       </p>
-      <p style="color:var(--text-secondary); font-size:0.875rem; margin-bottom:2rem;">
+      <p style="color:var(--text-secondary); font-size:0.875rem; margin-bottom:1rem;">
         Namespace: <strong id="final-ns"></strong>
       </p>
-      <button class="btn btn-primary" onclick="goToConsole()" style="max-width:300px; margin:0 auto;">
-        Console 로그인 →
+      <div class="final-url" id="final-url"></div>
+      <button class="btn btn-primary" onclick="goToConsole()" style="max-width:300px; margin:0 auto; display:block;">
+        Console 로그인
       </button>
       <p style="color:var(--text-secondary); font-size:0.75rem; margin-top:0.75rem;">
         Keycloak 로그인 화면으로 이동합니다
@@ -258,6 +366,34 @@
 <script>
 let currentStep = 1;
 let config = {};
+let phaseStartTime = 0;
+let logPollTimer = null;
+let lastLogCount = 0;
+
+// Password visibility toggle
+function togglePw(btn) {
+  const wrapper = btn.closest('.pw-wrapper');
+  const input = wrapper.querySelector('input');
+  const eyeOn = btn.querySelector('.eye-icon');
+  const eyeOff = btn.querySelector('.eye-off-icon');
+  if (input.type === 'password') {
+    input.type = 'text';
+    eyeOn.style.display = 'none';
+    eyeOff.style.display = 'block';
+  } else {
+    input.type = 'password';
+    eyeOn.style.display = 'block';
+    eyeOff.style.display = 'none';
+  }
+}
+
+// Update subdomain suffixes when domain changes
+document.getElementById('domain').addEventListener('input', function() {
+  const domain = this.value.trim().toLowerCase() || 'example.com';
+  document.querySelectorAll('.subdomain-suffix').forEach(el => {
+    el.textContent = '.' + domain;
+  });
+});
 
 function goToStep(step) {
   // Validate Step 1
@@ -266,17 +402,30 @@ function goToStep(step) {
     const domain = document.getElementById('domain').value.trim();
     const orgName = document.getElementById('orgName').value.trim();
     const pw = document.getElementById('adminPassword').value;
+    const consolePw = document.getElementById('consoleAdminPassword').value;
     if (!ns) { alert('Namespace를 입력해주세요.'); return; }
     if (!domain) { alert('Domain을 입력해주세요.'); return; }
     if (!orgName) { alert('Organization Name을 입력해주세요.'); return; }
-    if (!pw || pw.length < 8) { alert('비밀번호를 8자 이상 입력해주세요.'); return; }
-    config = { namespace: ns, domain: domain, orgName: orgName, adminPassword: pw };
+    if (!pw || pw.length < 8) { alert('Admin 비밀번호를 8자 이상 입력해주세요.'); return; }
+    if (!consolePw || consolePw.length < 8) { alert('Console Admin 비밀번호를 8자 이상 입력해주세요.'); return; }
+    config = {
+      namespace: ns, domain: domain, orgName: orgName,
+      adminPassword: pw, consoleAdminPassword: consolePw,
+      subdomains: {
+        console: document.getElementById('sub-console').value.trim() || 'console',
+        auth: document.getElementById('sub-auth').value.trim() || 'auth',
+        mail: document.getElementById('sub-mail').value.trim() || 'mail',
+        portal: document.getElementById('sub-portal').value.trim() || 'portal'
+      }
+    };
   }
 
   document.querySelectorAll('.step-card').forEach(c => c.classList.add('hidden'));
-  document.getElementById('step-' + step).classList.remove('hidden');
+  const target = document.getElementById('step-' + step);
+  target.classList.remove('hidden');
+  target.classList.add('animate-in');
 
-  // Update stepper
+  // Update stepper (4 steps total)
   document.querySelectorAll('.stepper-item').forEach(item => {
     const s = parseInt(item.dataset.step);
     item.classList.remove('active', 'done');
@@ -290,9 +439,22 @@ function goToStep(step) {
   currentStep = step;
 }
 
+// SVG icons for step status
+const checkSvg = '<svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="4 10 8 14 16 6"/></svg>';
+const xSvg = '<svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>';
+
+function formatElapsed(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + 's';
+  return Math.floor(s/60) + 'm ' + (s%60) + 's';
+}
+
 async function startInfra() {
   document.getElementById('infra-start-btn').disabled = true;
   document.getElementById('infra-status').textContent = '설치 시작 중...';
+  document.getElementById('infra-log').classList.remove('hidden');
+  phaseStartTime = Date.now();
+  lastLogCount = 0;
 
   const res = await fetch('/api/setup', {
     method: 'POST',
@@ -306,14 +468,21 @@ async function startInfra() {
     return;
   }
 
-  pollPhase('infra', 'infra-steps', 'infra-status', 4, () => {
-    goToStep(3);
-    startServices();
+  startLogPolling('infra-log');
+  pollPhase('infra', 'infra-steps', 'infra-status', 4, 'infra-bar', 'infra-progress-text', 'infra-elapsed', () => {
+    stopLogPolling();
+    setTimeout(() => {
+      goToStep(3);
+      startServices();
+    }, 1000);
   });
 }
 
 async function startServices() {
   document.getElementById('service-status').textContent = '서비스 설치 중...';
+  document.getElementById('svc-log').classList.remove('hidden');
+  phaseStartTime = Date.now();
+  lastLogCount = 0;
 
   const res = await fetch('/api/setup', {
     method: 'POST',
@@ -321,58 +490,134 @@ async function startServices() {
     body: JSON.stringify({...config, phase: 'services'})
   });
 
-  pollPhase('services', 'service-steps', 'service-status', 3, () => {
-    goToStep(4);
+  startLogPolling('svc-log');
+  pollPhase('services', 'service-steps', 'service-status', 6, 'svc-bar', 'svc-progress-text', 'svc-elapsed', () => {
+    stopLogPolling();
+    document.getElementById('final-domain').textContent = config.domain;
+    document.getElementById('final-ns').textContent = config.namespace;
+    const authSub = (config.subdomains && config.subdomains.auth) || 'auth';
+    const consoleSub = (config.subdomains && config.subdomains.console) || 'console';
+    const domain = config.domain.toLowerCase();
+    const loginUrl = 'https://' + authSub + '.' + domain + '/realms/admin/protocol/openid-connect/auth?client_id=polyon-console&redirect_uri=https://' + consoleSub + '.' + domain + '/&response_type=code&scope=openid';
+    document.getElementById('final-url').textContent = loginUrl;
+    setTimeout(() => goToStep(4), 1500);
   });
 }
 
-async function startApps() {
-  document.getElementById('apps-install-btn').disabled = true;
-  const apps = [];
-  document.querySelectorAll('.app-item input:checked').forEach(cb => apps.push(cb.value));
-  config.apps = apps;
-
-  const res = await fetch('/api/setup', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({...config, phase: 'apps'})
-  });
-
-  document.getElementById('final-domain').textContent = config.domain;
-  document.getElementById('final-ns').textContent = config.namespace;
-  goToStep(5);
+function startLogPolling(logAreaId) {
+  stopLogPolling();
+  logPollTimer = setInterval(() => fetchLogs(logAreaId), 2000);
+  fetchLogs(logAreaId);
 }
 
-async function pollPhase(phase, listId, statusId, total, onComplete) {
+function stopLogPolling() {
+  if (logPollTimer) {
+    clearInterval(logPollTimer);
+    logPollTimer = null;
+  }
+}
+
+async function fetchLogs(logAreaId) {
+  try {
+    const res = await fetch('/api/logs');
+    const logs = await res.json();
+    if (!logs || logs.length === lastLogCount) return;
+
+    const logArea = document.getElementById(logAreaId);
+    // Append only new entries
+    for (let i = lastLogCount; i < logs.length; i++) {
+      const entry = logs[i];
+      const line = document.createElement('div');
+      line.className = 'log-line ' + entry.level;
+      const t = new Date(entry.time);
+      const ts = t.toTimeString().slice(0,8);
+      const label = entry.level === 'error' ? 'ERR' : entry.level === 'success' ? 'OK ' : 'INF';
+      line.innerHTML = '<span class="log-label">[' + ts + ' ' + label + ']</span> ' + escapeHtml(entry.message);
+      logArea.appendChild(line);
+    }
+    lastLogCount = logs.length;
+    logArea.scrollTop = logArea.scrollHeight;
+  } catch(e) { /* ignore poll errors */ }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function pollPhase(phase, listId, statusId, total, barId, progressTextId, elapsedId, onComplete) {
   const res = await fetch('/api/state');
   const data = await res.json();
   const list = document.getElementById(listId);
-  const items = list.querySelectorAll('li .step-icon');
+  const items = list.querySelectorAll('li');
+  const icons = list.querySelectorAll('li .step-icon');
+
+  let doneCount = 0;
+  const now = Date.now();
 
   if (data.steps) {
     data.steps.forEach((s, i) => {
-      if (i < items.length) {
-        items[i].className = 'step-icon ' + s.status;
+      if (i >= icons.length) return;
+      icons[i].className = 'step-icon ' + s.status;
+      icons[i].innerHTML = s.status === 'done' ? checkSvg : s.status === 'error' ? xSvg : '';
+
+      // Active row highlight
+      items[i].classList.toggle('step-active', s.status === 'running');
+
+      // Time display
+      const timeEl = items[i].querySelector('.step-time');
+      if (s.status === 'running' && s.startedAt) {
+        const elapsed = Math.floor((now - s.startedAt) / 1000);
+        timeEl.textContent = elapsed + 's';
+        timeEl.className = 'step-time';
+      } else if (s.status === 'done' && s.startedAt && s.doneAt) {
+        const elapsed = Math.floor((s.doneAt - s.startedAt) / 1000);
+        timeEl.textContent = elapsed + 's';
+        timeEl.className = 'step-time success';
+      } else if (s.status === 'error') {
+        timeEl.textContent = s.error ? s.error.substring(0, 30) : '';
+        timeEl.className = 'step-time error';
+      } else {
+        timeEl.textContent = '';
       }
+
+      if (s.status === 'done') doneCount++;
     });
   }
+
+  // Progress bar
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  document.getElementById(barId).style.width = pct + '%';
+  const totalElapsed = formatElapsed(now - phaseStartTime);
+  document.getElementById(progressTextId).textContent = doneCount + '/' + total + ' 완료';
+  document.getElementById(elapsedId).textContent = totalElapsed;
 
   document.getElementById(statusId).textContent = data.message || '설치 중...';
 
   if (data.state === 'phase_done') {
-    document.getElementById(statusId).textContent = '✅ 완료';
+    document.getElementById(barId).style.width = '100%';
+    document.getElementById(statusId).textContent = '완료';
     document.getElementById(statusId).className = 'status-msg complete';
-    setTimeout(onComplete, 1000);
+    document.getElementById(progressTextId).textContent = total + '/' + total + ' 완료';
+    onComplete();
   } else if (data.state === 'error') {
-    document.getElementById(statusId).textContent = '❌ ' + data.message;
+    document.getElementById(statusId).textContent = data.message;
+    document.getElementById(statusId).className = 'status-msg';
+    document.getElementById(statusId).style.color = 'var(--error)';
+    stopLogPolling();
   } else {
-    setTimeout(() => pollPhase(phase, listId, statusId, total, onComplete), 1500);
+    setTimeout(() => pollPhase(phase, listId, statusId, total, barId, progressTextId, elapsedId, onComplete), 1500);
   }
 }
 
 function goToConsole() {
-  const domain = config.domain ? config.domain.toLowerCase() : 'cmars.com';
-  window.location.href = 'https://console.' + domain + '/auth/realms/admin/protocol/openid-connect/auth?client_id=polyon-console&redirect_uri=https://console.' + domain + '&response_type=code&scope=openid';
+  const domain = config.domain ? config.domain.toLowerCase() : 'example.com';
+  const consoleSub = (config.subdomains && config.subdomains.console) || 'console';
+  const authSub = (config.subdomains && config.subdomains.auth) || 'auth';
+  const consoleHost = consoleSub + '.' + domain;
+  const authHost = authSub + '.' + domain;
+  window.location.href = 'https://' + authHost + '/realms/admin/protocol/openid-connect/auth?client_id=polyon-console&redirect_uri=https://' + consoleHost + '/&response_type=code&scope=openid';
 }
 </script>
 </body>
