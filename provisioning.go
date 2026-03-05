@@ -36,12 +36,12 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "admin Realm 생성 완료")
 
-	// 4. Create "helios" realm
-	appendLog("info", "helios Realm 생성 중...")
-	if err := createRealm(keycloakURL, token, "helios"); err != nil {
-		return fmt.Errorf("create helios realm: %w", err)
+	// 4. Create "polyon" realm
+	appendLog("info", "polyon Realm 생성 중...")
+	if err := createRealm(keycloakURL, token, "polyon"); err != nil {
+		return fmt.Errorf("create polyon realm: %w", err)
 	}
-	appendLog("success", "helios Realm 생성 완료")
+	appendLog("success", "polyon Realm 생성 완료")
 
 	// 5. Create OIDC client "polyon-console" in admin realm
 	appendLog("info", "polyon-console OIDC 클라이언트 생성 중...")
@@ -57,12 +57,12 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-forward-auth 클라이언트 생성 완료 (admin realm)")
 
-	// 6. Create OIDC client "polyon-portal" in helios realm
+	// 6. Create OIDC client "polyon-portal" in polyon realm
 	appendLog("info", "polyon-portal OIDC 클라이언트 생성 중...")
-	if err := createOIDCClient(keycloakURL, token, "helios", "polyon-portal", tcfg.PortalDomain); err != nil {
+	if err := createOIDCClient(keycloakURL, token, "polyon", "polyon-portal", tcfg.PortalDomain); err != nil {
 		return fmt.Errorf("create polyon-portal client: %w", err)
 	}
-	appendLog("success", "polyon-portal 클라이언트 생성 완료 (helios realm)")
+	appendLog("success", "polyon-portal 클라이언트 생성 완료 (polyon realm)")
 
 	// 7. Create local admin user in admin realm (no LDAP)
 	appendLog("info", "admin realm 관리자 계정 생성 중...")
@@ -71,20 +71,20 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "admin realm 관리자 계정 생성 완료 (admin)")
 
-	// 8. Create LDAP federation in helios realm only
-	appendLog("info", "helios realm LDAP 페더레이션 설정 중...")
-	fedID, err := createLDAPFederation(keycloakURL, token, "helios", tcfg)
+	// 8. Create LDAP federation in polyon realm only
+	appendLog("info", "polyon realm LDAP 페더레이션 설정 중...")
+	fedID, err := createLDAPFederation(keycloakURL, token, "polyon", tcfg)
 	if err != nil {
-		return fmt.Errorf("create LDAP federation in helios: %w", err)
+		return fmt.Errorf("create LDAP federation in polyon: %w", err)
 	}
-	appendLog("success", fmt.Sprintf("helios realm LDAP 페더레이션 완료 (id=%s)", fedID))
+	appendLog("success", fmt.Sprintf("polyon realm LDAP 페더레이션 완료 (id=%s)", fedID))
 
-	// 9. Trigger fullSync for helios realm
-	appendLog("info", "helios realm LDAP 동기화 중...")
-	if err := triggerLDAPSync(keycloakURL, token, "helios", fedID); err != nil {
-		return fmt.Errorf("LDAP sync in helios: %w", err)
+	// 9. Trigger fullSync for polyon realm
+	appendLog("info", "polyon realm LDAP 동기화 중...")
+	if err := triggerLDAPSync(keycloakURL, token, "polyon", fedID); err != nil {
+		return fmt.Errorf("LDAP sync in polyon: %w", err)
 	}
-	appendLog("success", "helios realm LDAP 동기화 완료")
+	appendLog("success", "polyon realm LDAP 동기화 완료")
 
 	// 9. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")

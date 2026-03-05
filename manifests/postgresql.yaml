@@ -8,9 +8,11 @@ metadata:
     app.kubernetes.io/part-of: polyon
 data:
   create-databases.sql: |
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'polyon') THEN CREATE ROLE polyon WITH LOGIN PASSWORD '{{.AdminPassword}}'; END IF; END $$;
     SELECT 'CREATE DATABASE keycloak' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')\gexec
     SELECT 'CREATE DATABASE stalwart' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'stalwart')\gexec
-    SELECT 'CREATE DATABASE gitea' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gitea')\gexec
+    SELECT 'CREATE DATABASE polyon OWNER polyon' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'polyon')\gexec
+    GRANT ALL PRIVILEGES ON DATABASE polyon TO polyon;
 ---
 # ── PostgreSQL Secret ──
 apiVersion: v1

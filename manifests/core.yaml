@@ -38,14 +38,14 @@ spec:
     spec:
       containers:
         - name: core
-          image: jupitertriangles/polyon-core:v1.0.0
+          image: jupitertriangles/polyon-core:v1.1.0
           ports:
             - containerPort: 8000
           env:
             - name: DB_HOST
               value: "polyon-db"
             - name: DATABASE_URL
-              value: "postgres://helios:{{.AdminPassword}}@polyon-db:5432/helios?sslmode=disable"
+              value: "postgres://polyon:{{.AdminPassword}}@polyon-db:5432/polyon?sslmode=disable"
             - name: SAMBA_HOST
               value: "polyon-dc"
             - name: LDAP_URL

@@ -96,7 +96,7 @@ spec:
     spec:
       containers:
         - name: console
-          image: jupitertriangles/polyon-ui:v1.0.0
+          image: jupitertriangles/polyon-console:v1.0.0
           ports:
             - containerPort: 80
           readinessProbe:
