@@ -100,7 +100,14 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Ingress 배포 완료")
 
-	// 10. Deploy Console
+	// 10. Deploy Core backend
+	appendLog("info", "Core 백엔드 배포 중...")
+	if err := deployManifest("core.yaml", "app=polyon-core", tcfg, 120*time.Second); err != nil {
+		return fmt.Errorf("deploy core: %w", err)
+	}
+	appendLog("success", "Core 백엔드 배포 완료")
+
+	// 11. Deploy Console
 	appendLog("info", "Console 배포 중...")
 	mu.Lock()
 	progress.Step = 6

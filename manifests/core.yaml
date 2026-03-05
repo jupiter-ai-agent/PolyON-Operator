@@ -1,0 +1,83 @@
+# ── PolyON Core Backend Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-core
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-core
+    app.kubernetes.io/part-of: polyon
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: polyon-core
+---
+# ── PolyON Core Backend Deployment ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-core
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-core
+    app.kubernetes.io/part-of: polyon
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-core
+  template:
+    metadata:
+      labels:
+        app: polyon-core
+    spec:
+      containers:
+        - name: core
+          image: jupitertriangles/polyon-core:v1.0.0
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_HOST
+              value: "polyon-db"
+            - name: DATABASE_URL
+              value: "postgres://helios:{{.AdminPassword}}@polyon-db:5432/helios?sslmode=disable"
+            - name: SAMBA_HOST
+              value: "polyon-dc"
+            - name: LDAP_URL
+              value: "ldap://polyon-dc:389"
+            - name: KEYCLOAK_URL
+              value: "http://polyon-auth:8080"
+            - name: STALWART_URL
+              value: "http://polyon-mail:8080"
+            - name: ELASTICSEARCH_URL
+              value: "http://polyon-search:9200"
+            - name: RUSTFS_ENDPOINT
+              value: "http://polyon-rustfs:9000"
+            - name: REDIS_URL
+              value: "redis://polyon-redis:6379"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
