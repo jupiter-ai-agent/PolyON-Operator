@@ -54,6 +54,8 @@ spec:
               value: "polyon-dc"
             - name: SAMBA_ADMIN_PASSWORD
               value: "{{.AdminPassword}}"
+            - name: ADMIN_PASSWORD
+              value: "{{.AdminPassword}}"
             - name: LDAP_URL
               value: "ldap://polyon-dc:389"
             - name: KEYCLOAK_URL
