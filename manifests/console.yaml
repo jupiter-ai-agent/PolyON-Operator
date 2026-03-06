@@ -29,7 +29,7 @@ data:
 
         # ── API proxy → polyon-core ──
         location /api/ {
-            set $upstream_api http://polyon-core:8000;
+            set $upstream_api http://polyon-core.{{.Namespace}}.svc.cluster.local:8000;
             proxy_pass $upstream_api;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -38,7 +38,7 @@ data:
         }
 
         location /health {
-            set $upstream_api http://polyon-core:8000;
+            set $upstream_api http://polyon-core.{{.Namespace}}.svc.cluster.local:8000;
             proxy_pass $upstream_api;
         }
 
@@ -64,7 +64,7 @@ data:
 
         # ── Keycloak Auth proxy ──
         location /auth/ {
-            set $upstream_kc http://polyon-auth:8080;
+            set $upstream_kc http://polyon-auth.{{.Namespace}}.svc.cluster.local:8080;
             proxy_pass $upstream_kc;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -77,7 +77,7 @@ data:
 
         # ── Grafana proxy ──
         location /grafana/ {
-            set $upstream_grafana http://polyon-grafana:3000;
+            set $upstream_grafana http://polyon-grafana.{{.Namespace}}.svc.cluster.local:3000;
             proxy_pass $upstream_grafana;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -90,7 +90,7 @@ data:
 
         # ── Stalwart Mail API proxy ──
         location /mail-proxy/ {
-            set $upstream_api http://polyon-core:8000;
+            set $upstream_api http://polyon-core.{{.Namespace}}.svc.cluster.local:8000;
             proxy_pass $upstream_api;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
