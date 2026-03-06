@@ -98,9 +98,23 @@ func appendLog(level, message string) {
 	log.Printf("[%s] %s", level, message)
 }
 
+var cachedTemplateConfig *TemplateConfig
+
 func init() {
 	progress = SetupProgress{State: "fresh"}
 	logBuffer = make([]LogEntry, 0, maxLogLines)
+}
+
+// getOrCreateTemplateConfig returns a cached TemplateConfig, ensuring
+// passwords are generated only once across infra and services phases.
+func getOrCreateTemplateConfig(cfg SetupConfig) TemplateConfig {
+	mu.Lock()
+	defer mu.Unlock()
+	if cachedTemplateConfig == nil {
+		tc := NewTemplateConfig(cfg)
+		cachedTemplateConfig = &tc
+	}
+	return *cachedTemplateConfig
 }
 
 func main() {
@@ -207,7 +221,7 @@ func runInfraSetup(cfg SetupConfig) {
 	progress.Step = 0
 	mu.Unlock()
 
-	tcfg := NewTemplateConfig(cfg)
+	tcfg := getOrCreateTemplateConfig(cfg)
 
 	appendLog("info", fmt.Sprintf("인프라 설치 시작: ns=%s domain=%s", cfg.Namespace, cfg.Domain))
 
@@ -316,7 +330,7 @@ func runServicesSetup(cfg SetupConfig) {
 	progress.State = "installing"
 	mu.Unlock()
 
-	tcfg := NewTemplateConfig(cfg)
+	tcfg := getOrCreateTemplateConfig(cfg)
 
 	appendLog("info", fmt.Sprintf("서비스 설치 시작: domain=%s", cfg.Domain))
 
