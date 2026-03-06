@@ -85,6 +85,7 @@ spec:
                 echo "[PolyON] Provisioning Samba AD DC: realm={{.DomainUpper}} domain={{.DomainNetBIOS}}"
                 rm -rf /etc/samba/smb.conf
                 samba-tool domain provision \
+                  --host-name="dc1" \
                   --realm="{{.DomainUpper}}" \
                   --domain="{{.DomainNetBIOS}}" \
                   --adminpass="{{.AdminPassword}}" \
