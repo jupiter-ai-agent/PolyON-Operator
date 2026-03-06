@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/part-of: polyon
 type: Opaque
 stringData:
-  SAMBA_ADMIN_PASSWORD: "{{.AdminPassword}}"
+  SAMBA_ADMIN_PASSWORD: "{{.DCAdminPassword}}"
 ---
 # ── Samba AD DC Service ──
 apiVersion: v1
@@ -88,7 +88,7 @@ spec:
                   --host-name="dc1" \
                   --realm="{{.DomainUpper}}" \
                   --domain="{{.DomainNetBIOS}}" \
-                  --adminpass="{{.AdminPassword}}" \
+                  --adminpass="{{.DCAdminPassword}}" \
                   --server-role=dc \
                   --dns-backend=SAMBA_INTERNAL \
                   --use-rfc2307

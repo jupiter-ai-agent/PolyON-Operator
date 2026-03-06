@@ -22,8 +22,8 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Keycloak 준비 완료")
 
-	// 2. Get admin token (use AdminPassword — matches KC_BOOTSTRAP_ADMIN_PASSWORD)
-	token, err := getKeycloakToken(keycloakURL, tcfg.AdminPassword)
+	// 2. Get admin token (use KCAdminPassword — matches KC_BOOTSTRAP_ADMIN_PASSWORD)
+	token, err := getKeycloakToken(keycloakURL, tcfg.KCAdminPassword)
 	if err != nil {
 		return fmt.Errorf("get admin token: %w", err)
 	}
@@ -271,7 +271,7 @@ func createLDAPFederation(baseURL, token, realm string, tcfg TemplateConfig) (st
 		"config": map[string][]string{
 			"connectionUrl":          {"ldap://polyon-dc:389"},
 			"bindDn":                 {bindDN},
-			"bindCredential":        {tcfg.AdminPassword},
+			"bindCredential":        {tcfg.DCAdminPassword},
 			"usersDn":               {usersDN},
 			"vendor":                {"ad"},
 			"editMode":              {"READ_ONLY"},

@@ -1,0 +1,44 @@
+# ── PolyON Common ConfigMap ──
+# 비밀이 아닌 공유 설정 (도메인, 서비스 URL 등)
+# 모든 서비스가 envFrom으로 참조
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polyon-common-config
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+data:
+  # Domain
+  POLYON_DOMAIN: "{{.Domain}}"
+  POLYON_DOMAIN_UPPER: "{{.DomainUpper}}"
+  POLYON_DOMAIN_NETBIOS: "{{.DomainNetBIOS}}"
+  POLYON_DOMAIN_DC: "{{.DomainDC}}"
+  POLYON_ORG_NAME: "{{.OrgName}}"
+
+  # External Domains
+  POLYON_CONSOLE_DOMAIN: "{{.ConsoleDomain}}"
+  POLYON_AUTH_DOMAIN: "{{.AuthDomain}}"
+  POLYON_PORTAL_DOMAIN: "{{.PortalDomain}}"
+  POLYON_MAIL_DOMAIN: "{{.MailDomain}}"
+
+  # Service URLs (cluster-internal)
+  POLYON_DB_HOST: "polyon-db"
+  POLYON_DB_PORT: "5432"
+  POLYON_REDIS_URL: "redis://polyon-redis:6379"
+  POLYON_LDAP_URL: "ldap://polyon-dc:389"
+  POLYON_AUTH_URL: "http://polyon-auth:8080"
+  POLYON_STALWART_URL: "http://polyon-mail:8080"
+  POLYON_SEARCH_URL: "http://polyon-search:9200"
+  POLYON_RUSTFS_URL: "http://polyon-rustfs:9000"
+
+  # Legacy compatibility aliases
+  SAMBA_HOST: "polyon-dc"
+  SAMBA_REALM: "{{.DomainUpper}}"
+  SAMBA_DOMAIN: "{{.DomainNetBIOS}}"
+  LDAP_URL: "ldap://polyon-dc:389"
+  KEYCLOAK_URL: "http://polyon-auth:8080"
+  STALWART_URL: "http://polyon-mail:8080"
+  ELASTICSEARCH_URL: "http://polyon-search:9200"
+  RUSTFS_ENDPOINT: "http://polyon-rustfs:9000"
+  REDIS_URL: "redis://polyon-redis:6379"

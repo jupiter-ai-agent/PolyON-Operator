@@ -51,7 +51,7 @@ data:
 
     [directory.ldap.bind]
     dn = "CN=Administrator,CN=Users,{{.DomainDC}}"
-    secret = "{{.AdminPassword}}"
+    secret = "{{.DCAdminPassword}}"
 
     [directory.ldap.filter]
     name = "(&(objectClass=user)(sAMAccountName=?))"
@@ -64,4 +64,4 @@ data:
 
     [authentication.fallback-admin]
     user = "admin"
-    secret = "{{.AdminPassword}}"
+    secret = "{{.StalwartAdminPassword}}"

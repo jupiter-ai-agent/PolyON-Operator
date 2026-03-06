@@ -41,33 +41,11 @@ spec:
           image: jupitertriangles/polyon-core:v1.2.0
           ports:
             - containerPort: 8000
-          env:
-            - name: DB_HOST
-              value: "polyon-db"
-            - name: DATABASE_URL
-              value: "postgres://polyon:{{.AdminPassword}}@polyon-db:5432/polyon?sslmode=disable"
-            - name: SAMBA_REALM
-              value: "{{.Domain}}"
-            - name: SAMBA_DOMAIN
-              value: "{{.DomainNetBIOS}}"
-            - name: SAMBA_HOST
-              value: "polyon-dc"
-            - name: SAMBA_ADMIN_PASSWORD
-              value: "{{.AdminPassword}}"
-            - name: ADMIN_PASSWORD
-              value: "{{.AdminPassword}}"
-            - name: LDAP_URL
-              value: "ldap://polyon-dc:389"
-            - name: KEYCLOAK_URL
-              value: "http://polyon-auth:8080"
-            - name: STALWART_URL
-              value: "http://polyon-mail:8080"
-            - name: ELASTICSEARCH_URL
-              value: "http://polyon-search:9200"
-            - name: RUSTFS_ENDPOINT
-              value: "http://polyon-rustfs:9000"
-            - name: REDIS_URL
-              value: "redis://polyon-redis:6379"
+          envFrom:
+            - configMapRef:
+                name: polyon-common-config
+            - secretRef:
+                name: polyon-common-secret
           readinessProbe:
             httpGet:
               path: /health

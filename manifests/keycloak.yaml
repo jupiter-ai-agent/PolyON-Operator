@@ -50,11 +50,17 @@ spec:
             - name: KC_DB_USERNAME
               value: "postgres"
             - name: KC_DB_PASSWORD
-              value: "{{.PostgresPassword}}"
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-common-secret
+                  key: POLYON_POSTGRES_PASSWORD
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: "admin"
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD
-              value: "{{.AdminPassword}}"
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-common-secret
+                  key: POLYON_KC_ADMIN_PASSWORD
             - name: KC_HEALTH_ENABLED
               value: "true"
             - name: KC_PROXY_HEADERS

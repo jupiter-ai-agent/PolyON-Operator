@@ -233,6 +233,26 @@ func runInfraSetup(cfg SetupConfig) {
 	}
 	appendLog("success", fmt.Sprintf("TLS 인증서 생성 완료 (*.%s)", cfg.Domain))
 
+	// Deploy common ConfigMap and Secret (must be before any service)
+	appendLog("info", "공통 ConfigMap/Secret 생성 중...")
+	if err := deployManifest("common-config.yaml", "", tcfg, 0); err != nil {
+		mu.Lock()
+		progress.State = "error"
+		progress.Message = "공통 ConfigMap 생성 실패: " + err.Error()
+		mu.Unlock()
+		appendLog("error", "공통 ConfigMap 생성 실패: "+err.Error())
+		return
+	}
+	if err := deployManifest("common-secret.yaml", "", tcfg, 0); err != nil {
+		mu.Lock()
+		progress.State = "error"
+		progress.Message = "공통 Secret 생성 실패: " + err.Error()
+		mu.Unlock()
+		appendLog("error", "공통 Secret 생성 실패: "+err.Error())
+		return
+	}
+	appendLog("success", "공통 ConfigMap/Secret 생성 완료 (서비스별 독립 비밀번호 적용)")
+
 	for i := range steps {
 		now := time.Now().UnixMilli()
 		mu.Lock()

@@ -10,7 +10,7 @@ metadata:
 type: Opaque
 stringData:
   RUSTFS_ACCESS_KEY: "polyon-admin"
-  RUSTFS_SECRET_KEY: "{{.AdminPassword}}"
+  RUSTFS_SECRET_KEY: "{{.RustFSSecretKey}}"
 ---
 # ── RustFS Service ──
 apiVersion: v1
