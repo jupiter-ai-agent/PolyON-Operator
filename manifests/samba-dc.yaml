@@ -126,6 +126,13 @@ spec:
               port: 389
             initialDelaySeconds: 30
             periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["samba-tool", "processes", "--name=ldap_server"]
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             requests:
               memory: 512Mi

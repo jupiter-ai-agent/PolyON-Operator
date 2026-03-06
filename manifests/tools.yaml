@@ -6,7 +6,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: polyon-pgweb
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-pgweb
+    app.kubernetes.io/part-of: polyon
+    app.kubernetes.io/component: tool
 spec:
   replicas: 1
   selector:
@@ -16,6 +20,8 @@ spec:
     metadata:
       labels:
         app: polyon-pgweb
+        app.kubernetes.io/part-of: polyon
+        app.kubernetes.io/component: tool
     spec:
       containers:
         - name: pgweb
@@ -29,6 +35,18 @@ spec:
               value: "postgres://{{.DBUser}}:{{.DBPassword}}@polyon-db:5432/polyon?sslmode=disable"
           ports:
             - containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /pgweb/
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /pgweb/
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 30
           resources:
             requests:
               memory: "64Mi"
@@ -41,7 +59,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: polyon-pgweb
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-pgweb
+    app.kubernetes.io/part-of: polyon
 spec:
   selector:
     app: polyon-pgweb
@@ -56,7 +77,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: polyon-redis-commander
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-redis-commander
+    app.kubernetes.io/part-of: polyon
+    app.kubernetes.io/component: tool
 spec:
   replicas: 1
   selector:
@@ -66,6 +91,8 @@ spec:
     metadata:
       labels:
         app: polyon-redis-commander
+        app.kubernetes.io/part-of: polyon
+        app.kubernetes.io/component: tool
     spec:
       containers:
         - name: redis-commander
@@ -79,6 +106,18 @@ spec:
               value: "8081"
           ports:
             - containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /redis/
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /redis/
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 30
           resources:
             requests:
               memory: "64Mi"
@@ -91,7 +130,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: polyon-redis-commander
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-redis-commander
+    app.kubernetes.io/part-of: polyon
 spec:
   selector:
     app: polyon-redis-commander
@@ -106,7 +148,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: polyon-elasticvue
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-elasticvue
+    app.kubernetes.io/part-of: polyon
+    app.kubernetes.io/component: tool
 spec:
   replicas: 1
   selector:
@@ -116,6 +162,8 @@ spec:
     metadata:
       labels:
         app: polyon-elasticvue
+        app.kubernetes.io/part-of: polyon
+        app.kubernetes.io/component: tool
     spec:
       containers:
         - name: elasticvue
@@ -125,6 +173,18 @@ spec:
               value: '[{"name":"polyon","uri":"http://polyon-search:9200"}]'
           ports:
             - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
           resources:
             requests:
               memory: "32Mi"
@@ -137,7 +197,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: polyon-elasticvue
-  namespace: polyon
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-elasticvue
+    app.kubernetes.io/part-of: polyon
 spec:
   selector:
     app: polyon-elasticvue

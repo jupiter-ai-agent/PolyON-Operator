@@ -1,0 +1,330 @@
+# ══════════════════════════════════════════════════════════════
+# K8s 운영 품질 강화 — NetworkPolicy · LimitRange · ServiceAccount
+# ══════════════════════════════════════════════════════════════
+
+---
+# ── ServiceAccount: polyon-services ──
+# 기본 default SA 대신 명시적 SA 사용
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: polyon-services
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+
+---
+# ── LimitRange: namespace 기본 리소스 제한 ──
+# Pod에 limits 미지정 시 자동 적용
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: polyon-limits
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 512Mi
+      defaultRequest:
+        cpu: 50m
+        memory: 64Mi
+      max:
+        cpu: "2"
+        memory: 4Gi
+
+---
+# ── ResourceQuota: namespace 전체 자원 상한 ──
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: polyon-quota
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 4Gi
+    limits.cpu: "8"
+    limits.memory: 12Gi
+    pods: "30"
+    services: "20"
+    configmaps: "30"
+    secrets: "20"
+    persistentvolumeclaims: "15"
+
+---
+# ══════════════════════════════════════════════════════════════
+# NetworkPolicy — 최소 권한 원칙
+# ══════════════════════════════════════════════════════════════
+
+# ── 1. Default Deny: namespace 내 모든 Ingress 차단 후 허용만 열기 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+
+---
+# ── 2. Console: Ingress(외부) + Core/Auth/Tools(내부) 허용 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-console
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-console
+  ingress:
+    # 외부(Traefik Ingress)에서 접근
+    - from: []
+      ports:
+        - port: 80
+
+---
+# ── 3. Core API: Console에서만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-core
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-core
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-console
+      ports:
+        - port: 8000
+
+---
+# ── 4. Keycloak: Console + Core + 외부(Ingress) 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-auth
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-auth
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-console
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+      ports:
+        - port: 8080
+    # 외부 Ingress
+    - from: []
+      ports:
+        - port: 8080
+
+---
+# ── 5. PostgreSQL: Core + Keycloak + Mail + pgweb만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-db
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+        - podSelector:
+            matchLabels:
+              app: polyon-auth
+        - podSelector:
+            matchLabels:
+              app: polyon-mail
+        - podSelector:
+            matchLabels:
+              app: polyon-pgweb
+      ports:
+        - port: 5432
+
+---
+# ── 6. Redis: Core + redis-commander만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-redis
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+        - podSelector:
+            matchLabels:
+              app: polyon-redis-commander
+      ports:
+        - port: 6379
+
+---
+# ── 7. OpenSearch: Core + Mail(FTS) + elasticvue만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-search
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-search
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+        - podSelector:
+            matchLabels:
+              app: polyon-mail
+        - podSelector:
+            matchLabels:
+              app: polyon-elasticvue
+        - podSelector:
+            matchLabels:
+              app: polyon-console
+      ports:
+        - port: 9200
+
+---
+# ── 8. Samba DC: Core + Keycloak + Mail (LDAP) 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dc
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-dc
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+        - podSelector:
+            matchLabels:
+              app: polyon-auth
+        - podSelector:
+            matchLabels:
+              app: polyon-mail
+      ports:
+        - port: 389
+        - port: 636
+        - port: 53
+          protocol: TCP
+        - port: 53
+          protocol: UDP
+        - port: 88
+        - port: 445
+
+---
+# ── 9. Stalwart Mail: Core + 외부(SMTP/IMAP) 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mail
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-mail
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+      ports:
+        - port: 8080
+    # 외부 메일 포트
+    - from: []
+      ports:
+        - port: 25
+        - port: 587
+        - port: 993
+        - port: 4190
+
+---
+# ── 10. RustFS: Core만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rustfs
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app: polyon-rustfs
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-core
+      ports:
+        - port: 9000
+
+---
+# ── 11. DB Tools: Console(nginx proxy)에서만 접근 ──
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-tools
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: tool
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: polyon-console
