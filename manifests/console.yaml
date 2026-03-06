@@ -44,19 +44,19 @@ data:
 
         # ── Operator API proxy (sentinel, setup, reset) ──
         location /api/sentinel/ {
-            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:80;
             proxy_pass $operator;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
         }
         location /api/setup/ {
-            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:80;
             proxy_pass $operator;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
         }
         location /api/reset/ {
-            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:80;
             proxy_pass $operator;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
