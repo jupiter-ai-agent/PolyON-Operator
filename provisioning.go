@@ -79,19 +79,19 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon realm LDAP 동기화 완료")
 
-	// 9. Deploy Ingress
-	appendLog("info", "Ingress 배포 중...")
+	// 9. Deploy Console
+	appendLog("info", "Console 배포 중...")
 	mu.Lock()
-	progress.Step = 7
-	progress.Message = "Ingress 설정 중..."
-	progress.Steps[6].Status = "running"
-	progress.Steps[6].StartedAt = time.Now().UnixMilli()
+	progress.Step = 5
+	progress.Message = "Console 배포 중..."
+	progress.Steps[4].Status = "running"
+	progress.Steps[4].StartedAt = time.Now().UnixMilli()
 	mu.Unlock()
 
-	if err := deployManifest("ingress.yaml", "", tcfg, 0); err != nil {
-		return fmt.Errorf("deploy ingress: %w", err)
+	if err := deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second); err != nil {
+		return fmt.Errorf("deploy console: %w", err)
 	}
-	appendLog("success", "Ingress 배포 완료")
+	appendLog("success", "Console 배포 완료")
 
 	// 10. Deploy Core backend
 	appendLog("info", "Core 백엔드 배포 중...")
@@ -100,19 +100,19 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Core 백엔드 배포 완료")
 
-	// 11. Deploy Console
-	appendLog("info", "Console 배포 중...")
+	// 11. Deploy Ingress
+	appendLog("info", "Ingress 배포 중...")
 	mu.Lock()
 	progress.Step = 6
-	progress.Message = "Console 배포 중..."
+	progress.Message = "Ingress 설정 중..."
 	progress.Steps[5].Status = "running"
 	progress.Steps[5].StartedAt = time.Now().UnixMilli()
 	mu.Unlock()
 
-	if err := deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second); err != nil {
-		return fmt.Errorf("deploy console: %w", err)
+	if err := deployManifest("ingress.yaml", "", tcfg, 0); err != nil {
+		return fmt.Errorf("deploy ingress: %w", err)
 	}
-	appendLog("success", "Console 배포 완료")
+	appendLog("success", "Ingress 배포 완료")
 
 	appendLog("success", "Keycloak 프로비저닝 완료")
 	return nil
