@@ -63,16 +63,16 @@ spec:
           command: ["sh", "-c"]
           args:
             - |
-              if [ ! -f /opt/stalwart-mail/etc/config.toml ]; then
+              if [ ! -f /opt/stalwart/etc/config.toml ]; then
                 echo "[PolyON] Copying initial config.toml to PVC"
-                mkdir -p /opt/stalwart-mail/etc
-                cp /config-source/config.toml /opt/stalwart-mail/etc/config.toml
+                mkdir -p /opt/stalwart/etc
+                cp /config-source/config.toml /opt/stalwart/etc/config.toml
               else
                 echo "[PolyON] config.toml already exists, skipping"
               fi
           volumeMounts:
             - name: stalwart-data
-              mountPath: /opt/stalwart-mail
+              mountPath: /opt/stalwart
             - name: config-source
               mountPath: /config-source
       containers:
@@ -104,7 +104,7 @@ spec:
               cpu: 500m
           volumeMounts:
             - name: stalwart-data
-              mountPath: /opt/stalwart-mail
+              mountPath: /opt/stalwart
       volumes:
         - name: config-source
           configMap:

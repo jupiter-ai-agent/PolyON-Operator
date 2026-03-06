@@ -29,6 +29,10 @@ data:
     bind = "[::]:4190"
     protocol = "managesieve"
 
+    [server.listener.http]
+    bind = "[::]:8080"
+    protocol = "http"
+
     [storage]
     data = "rocksdb"
     fts = "opensearch"
@@ -38,7 +42,7 @@ data:
 
     [store.rocksdb]
     type = "rocksdb"
-    path = "/opt/stalwart-mail/data"
+    path = "/opt/stalwart/data"
 
     [store.opensearch]
     type = "elasticsearch"
