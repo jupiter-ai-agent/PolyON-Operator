@@ -32,6 +32,9 @@ data:
   POLYON_SEARCH_URL: "http://polyon-search:9200"
   POLYON_RUSTFS_URL: "http://polyon-rustfs:9000"
 
+  # Stalwart Admin
+  STALWART_ADMIN_USER: "admin"
+
   # Legacy compatibility aliases
   SAMBA_HOST: "polyon-dc"
   SAMBA_REALM: "{{.DomainUpper}}"

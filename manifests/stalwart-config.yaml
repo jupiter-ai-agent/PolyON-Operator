@@ -12,25 +12,25 @@ data:
     [server]
     hostname = "{{.MailDomain}}"
 
-    [server.listener.smtp]
-    bind = "[::]:25"
+    [server.listener."smtp"]
+    bind = ["[::]:25"]
     protocol = "smtp"
 
-    [server.listener.submission]
-    bind = "[::]:587"
+    [server.listener."submission"]
+    bind = ["[::]:587"]
     protocol = "smtp"
 
-    [server.listener.imaps]
-    bind = "[::]:993"
+    [server.listener."imaps"]
+    bind = ["[::]:993"]
     protocol = "imap"
     tls.implicit = true
 
-    [server.listener.sieve]
-    bind = "[::]:4190"
+    [server.listener."sieve"]
+    bind = ["[::]:4190"]
     protocol = "managesieve"
 
-    [server.listener.http]
-    bind = "[::]:8080"
+    [server.listener."http"]
+    bind = ["[::]:8080"]
     protocol = "http"
 
     [storage]
@@ -40,31 +40,38 @@ data:
     lookup = "rocksdb"
     directory = "ldap"
 
-    [store.rocksdb]
+    [store."rocksdb"]
     type = "rocksdb"
     path = "/opt/stalwart/data"
 
-    [store.opensearch]
+    [store."opensearch"]
     type = "elasticsearch"
     url = "http://polyon-search:9200"
 
-    [directory.ldap]
+    [directory."ldap"]
     type = "ldap"
     url = "ldap://polyon-dc:389"
-    base-dn = "{{.DomainDC}}"
+    base-dn = "CN=Users,{{.DomainDC}}"
 
-    [directory.ldap.bind]
+    [directory."ldap".bind]
     dn = "CN=Administrator,CN=Users,{{.DomainDC}}"
     secret = "{{.DCAdminPassword}}"
+    auth.method = "lookup"
 
-    [directory.ldap.filter]
+    [directory."ldap".filter]
     name = "(&(objectClass=user)(sAMAccountName=?))"
     email = "(&(objectClass=user)(|(mail=?)(userPrincipalName=?)))"
 
-    [directory.ldap.attributes]
+    [directory."ldap".attributes]
     name = "sAMAccountName"
     email = "mail"
     description = "displayName"
+
+    [tracer."stdout"]
+    type = "stdout"
+    level = "info"
+    ansi = false
+    enable = true
 
     [authentication.fallback-admin]
     user = "admin"
