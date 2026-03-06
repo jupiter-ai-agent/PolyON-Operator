@@ -79,26 +79,26 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon realm LDAP 동기화 완료")
 
-	// 9. Deploy Console
-	appendLog("info", "Console 배포 중...")
+	// 9. Deploy Core backend (must be before Console — nginx needs polyon-core upstream)
+	appendLog("info", "Core 백엔드 배포 중...")
 	mu.Lock()
 	progress.Step = 5
-	progress.Message = "Console 배포 중..."
+	progress.Message = "Core + Console 배포 중..."
 	progress.Steps[4].Status = "running"
 	progress.Steps[4].StartedAt = time.Now().UnixMilli()
 	mu.Unlock()
 
-	if err := deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second); err != nil {
-		return fmt.Errorf("deploy console: %w", err)
-	}
-	appendLog("success", "Console 배포 완료")
-
-	// 10. Deploy Core backend
-	appendLog("info", "Core 백엔드 배포 중...")
 	if err := deployManifest("core.yaml", "app=polyon-core", tcfg, 120*time.Second); err != nil {
 		return fmt.Errorf("deploy core: %w", err)
 	}
 	appendLog("success", "Core 백엔드 배포 완료")
+
+	// 10. Deploy Console (after Core — nginx upstream dependency)
+	appendLog("info", "Console 배포 중...")
+	if err := deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second); err != nil {
+		return fmt.Errorf("deploy console: %w", err)
+	}
+	appendLog("success", "Console 배포 완료")
 
 	// 11. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")
