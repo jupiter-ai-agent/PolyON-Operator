@@ -11,30 +11,61 @@ data:
   default.conf: |
     server {
         listen 80;
-        server_name _;
-
+        resolver 10.96.0.10 valid=10s ipv6=off;
         root /usr/share/nginx/html;
         index index.html;
 
-        # SPA fallback
+        # ── SPA fallback ──
         location / {
             try_files $uri $uri/ /index.html;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
         }
 
-        # Core API backend
+        # ── JS/CSS cache bust (exclude proxied paths) ──
+        location ~* ^/(?!grafana/|pgweb/|redis/|elasticvue/|es-proxy/|strapi/|admin/).*\.(js|css)$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            expires 0;
+        }
+
+        # ── API proxy → polyon-core ──
         location /api/ {
-            proxy_pass http://polyon-core:8000;
+            set $upstream_api http://polyon-core:8000;
+            proxy_pass $upstream_api;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_read_timeout 120s;
-            proxy_connect_timeout 10s;
+            proxy_set_header Authorization $http_authorization;
         }
 
-        # Keycloak 26.x — no /auth prefix; strip /auth/ from upstream path
+        location /health {
+            set $upstream_api http://polyon-core:8000;
+            proxy_pass $upstream_api;
+        }
+
+        # ── Operator API proxy (sentinel, setup, reset) ──
+        location /api/sentinel/ {
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            proxy_pass $operator;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        location /api/setup/ {
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            proxy_pass $operator;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        location /api/reset/ {
+            set $operator http://polyon-operator.polyon-operator.svc.cluster.local:1110;
+            proxy_pass $operator;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        # ── Keycloak Auth proxy ──
         location /auth/ {
-            proxy_pass http://polyon-auth:8080/;
+            set $upstream_kc http://polyon-auth:8080;
+            proxy_pass $upstream_kc;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -42,17 +73,75 @@ data:
             proxy_buffer_size 128k;
             proxy_buffers 4 256k;
             proxy_busy_buffers_size 256k;
-            proxy_read_timeout 120s;
         }
 
-        # Operator API
-        location /operator/ {
-            proxy_pass http://polyon-operator.polyon-operator.svc.cluster.local:8080/;
+        # ── Grafana proxy ──
+        location /grafana/ {
+            set $upstream_grafana http://polyon-grafana:3000;
+            proxy_pass $upstream_grafana;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_read_timeout 60s;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+        }
+
+        # ── Stalwart Mail API proxy ──
+        location /mail-proxy/ {
+            set $upstream_api http://polyon-core:8000;
+            proxy_pass $upstream_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header Authorization $http_authorization;
+        }
+
+        # ── DB Tools proxy ──
+        location /pgweb/ {
+            set $pgweb http://polyon-pgweb.{{.Namespace}}.svc.cluster.local:8081;
+            proxy_pass $pgweb;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+        }
+
+        location /redis/ {
+            set $redis_cmd http://polyon-redis-commander.{{.Namespace}}.svc.cluster.local:8081;
+            proxy_pass $redis_cmd;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+        }
+
+        location /elasticvue/ {
+            set $elasticvue http://polyon-elasticvue.{{.Namespace}}.svc.cluster.local:8080;
+            proxy_pass $elasticvue;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_http_version 1.1;
+        }
+
+        # ── ES proxy (Elasticvue → OpenSearch API) ──
+        location /es-proxy/ {
+            set $es http://polyon-search.{{.Namespace}}.svc.cluster.local:9200;
+            proxy_pass $es;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_http_version 1.1;
         }
     }
 ---
@@ -96,7 +185,8 @@ spec:
     spec:
       containers:
         - name: console
-          image: jupitertriangles/polyon-console:v1.3.0
+          image: jupitertriangles/polyon-console:v1.4.0
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           readinessProbe:
