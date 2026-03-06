@@ -38,7 +38,7 @@ spec:
     spec:
       containers:
         - name: core
-          image: jupitertriangles/polyon-core:v1.2.0
+          image: jupitertriangles/polyon-core:v1.3.0
           ports:
             - containerPort: 8000
           envFrom:
