@@ -1,4 +1,4 @@
-# ── Ingress: Console (oauth2-proxy as reverse proxy) ──
+# ── Ingress: Console (direct to Console nginx — SPA handles OIDC PKCE) ──
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -21,9 +21,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: polyon-oauth2-proxy
+                name: polyon-console
                 port:
-                  number: 4180
+                  number: 80
 ---
 # ── Ingress: Auth (Keycloak) ──
 apiVersion: networking.k8s.io/v1

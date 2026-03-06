@@ -222,6 +222,17 @@ func runInfraSetup(cfg SetupConfig) {
 	}
 	appendLog("success", "네임스페이스 생성 완료")
 
+	// Create TLS secret (self-signed wildcard cert)
+	if err := ensureTLSSecret(tcfg); err != nil {
+		mu.Lock()
+		progress.State = "error"
+		progress.Message = "TLS 인증서 생성 실패: " + err.Error()
+		mu.Unlock()
+		appendLog("error", "TLS 인증서 생성 실패: "+err.Error())
+		return
+	}
+	appendLog("success", fmt.Sprintf("TLS 인증서 생성 완료 (*.%s)", cfg.Domain))
+
 	for i := range steps {
 		now := time.Now().UnixMilli()
 		mu.Lock()

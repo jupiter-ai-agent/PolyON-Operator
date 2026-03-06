@@ -4,15 +4,3 @@ metadata:
   name: {{.Namespace}}
   labels:
     app.kubernetes.io/part-of: polyon
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: polyon-tls
-  namespace: {{.Namespace}}
-  labels:
-    app.kubernetes.io/part-of: polyon
-type: kubernetes.io/tls
-data:
-  tls.crt: {{.TLSCertBase64}}
-  tls.key: {{.TLSKeyBase64}}

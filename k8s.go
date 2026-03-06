@@ -2,12 +2,17 @@ package main
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"embed"
 	"encoding/base64"
-	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"log"
+	"math/big"
 	"os"
 	"os/exec"
 	"strings"
@@ -33,8 +38,6 @@ type TemplateConfig struct {
 	MailDomain            string // e.g. mail.cmars.com
 	PortalDomain          string // e.g. portal.cmars.com
 	DomainDC                string // e.g. DC=cmars,DC=com
-	CookieSecret            string // 16-byte base64 for oauth2-proxy
-	ForwardAuthClientSecret string // 32-byte hex for oauth2-proxy confidential client
 	TLSCertBase64           string // base64-encoded TLS certificate
 	TLSKeyBase64            string // base64-encoded TLS private key
 }
@@ -85,16 +88,6 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		consoleAdminPw = cfg.AdminPassword
 	}
 
-	// Generate CookieSecret (16 bytes, base64)
-	cookieBytes := make([]byte, 16)
-	rand.Read(cookieBytes)
-	cookieSecret := base64.StdEncoding.EncodeToString(cookieBytes)
-
-	// Generate ForwardAuthClientSecret (32 bytes, hex)
-	authSecretBytes := make([]byte, 32)
-	rand.Read(authSecretBytes)
-	forwardAuthSecret := hex.EncodeToString(authSecretBytes)
-
 	// Read TLS certificate and key
 	var tlsCertB64, tlsKeyB64 string
 	if certData, err := os.ReadFile("/tls/tls.crt"); err == nil {
@@ -118,8 +111,6 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		MailDomain:              mailSub + "." + domainLower,
 		PortalDomain:            portalSub + "." + domainLower,
 		DomainDC:                DomainToDC(domain),
-		CookieSecret:            cookieSecret,
-		ForwardAuthClientSecret: forwardAuthSecret,
 		TLSCertBase64:           tlsCertB64,
 		TLSKeyBase64:            tlsKeyB64,
 	}
@@ -212,4 +203,102 @@ func ensureNamespace(cfg TemplateConfig) error {
 		return err
 	}
 	return applyManifest(yaml)
+}
+
+// generateSelfSignedCert creates a wildcard self-signed certificate for *.domain
+func generateSelfSignedCert(domain string) (certPEM, keyPEM []byte, err error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate key: %w", err)
+	}
+
+	serial, _ := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName:   "*." + domain,
+			Organization: []string{"PolyON"},
+		},
+		NotBefore:   time.Now().Add(-1 * time.Hour),
+		NotAfter:    time.Now().Add(10 * 365 * 24 * time.Hour), // 10년
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:    []string{"*." + domain, domain},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create certificate: %w", err)
+	}
+
+	var certBuf bytes.Buffer
+	pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+	privDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal key: %w", err)
+	}
+
+	var keyBuf bytes.Buffer
+	pem.Encode(&keyBuf, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privDER})
+
+	return certBuf.Bytes(), keyBuf.Bytes(), nil
+}
+
+// ensureTLSSecret creates the polyon-tls Secret with a self-signed wildcard cert
+func ensureTLSSecret(cfg TemplateConfig) error {
+	// Check if secret already exists
+	checkCmd := exec.Command("kubectl", "get", "secret", "polyon-tls", "-n", cfg.Namespace, "--no-headers")
+	if err := checkCmd.Run(); err == nil {
+		log.Printf("[K8S] polyon-tls secret already exists in %s", cfg.Namespace)
+		return nil
+	}
+
+	// Generate self-signed wildcard certificate
+	certPEM, keyPEM, err := generateSelfSignedCert(cfg.Domain)
+	if err != nil {
+		return fmt.Errorf("generate TLS cert: %w", err)
+	}
+
+	// Write temp files for kubectl create secret tls
+	certFile, err := os.CreateTemp("", "polyon-cert-*.pem")
+	if err != nil {
+		return fmt.Errorf("create cert temp file: %w", err)
+	}
+	defer os.Remove(certFile.Name())
+
+	keyFile, err := os.CreateTemp("", "polyon-key-*.pem")
+	if err != nil {
+		return fmt.Errorf("create key temp file: %w", err)
+	}
+	defer os.Remove(keyFile.Name())
+
+	if _, err := certFile.Write(certPEM); err != nil {
+		return fmt.Errorf("write cert: %w", err)
+	}
+	certFile.Close()
+
+	if _, err := keyFile.Write(keyPEM); err != nil {
+		return fmt.Errorf("write key: %w", err)
+	}
+	keyFile.Close()
+
+	// Use kubectl create secret tls directly
+	cmd := exec.Command("kubectl", "create", "secret", "tls", "polyon-tls",
+		"--cert="+certFile.Name(),
+		"--key="+keyFile.Name(),
+		"-n", cfg.Namespace,
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("kubectl create secret tls: %s\n%s", stderr.String(), err)
+	}
+
+	log.Printf("[K8S] %s", strings.TrimSpace(string(out)))
+	return nil
 }

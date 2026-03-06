@@ -50,13 +50,6 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-console 클라이언트 생성 완료 (admin realm)")
 
-	// 5b. Create confidential client "polyon-forward-auth" for oauth2-proxy
-	appendLog("info", "polyon-forward-auth 클라이언트 생성 중...")
-	if err := createConfidentialClient(keycloakURL, token, "admin", "polyon-forward-auth", tcfg.ConsoleDomain, tcfg.ForwardAuthClientSecret); err != nil {
-		return fmt.Errorf("create polyon-forward-auth client: %w", err)
-	}
-	appendLog("success", "polyon-forward-auth 클라이언트 생성 완료 (admin realm)")
-
 	// 6. Create OIDC client "polyon-portal" in polyon realm
 	appendLog("info", "polyon-portal OIDC 클라이언트 생성 중...")
 	if err := createOIDCClient(keycloakURL, token, "polyon", "polyon-portal", tcfg.PortalDomain); err != nil {
@@ -206,40 +199,6 @@ func createOIDCClient(baseURL, token, realm, clientID, redirectDomain string) er
 		"protocol":     "openid-connect",
 		"redirectUris":  []string{"https://" + redirectDomain + "/*"},
 		"webOrigins":    []string{"https://" + redirectDomain},
-		"attributes": map[string]string{
-			"pkce.code.challenge.method": "S256",
-		},
-	}
-	body, _ := json.Marshal(payload)
-
-	req, _ := http.NewRequest("POST", baseURL+"/admin/realms/"+realm+"/clients", bytes.NewReader(body))
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 201 && resp.StatusCode != 409 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("create client %s failed (%d): %s", clientID, resp.StatusCode, string(respBody))
-	}
-	return nil
-}
-
-func createConfidentialClient(baseURL, token, realm, clientID, redirectDomain, clientSecret string) error {
-	payload := map[string]interface{}{
-		"clientId":                clientID,
-		"enabled":                 true,
-		"publicClient":            false,
-		"protocol":                "openid-connect",
-		"clientAuthenticatorType": "client-secret",
-		"secret":                  clientSecret,
-		"redirectUris":            []string{"https://" + redirectDomain + "/oauth2/callback"},
-		"webOrigins":              []string{"https://" + redirectDomain},
 		"attributes": map[string]string{
 			"pkce.code.challenge.method": "S256",
 		},
