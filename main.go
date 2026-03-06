@@ -277,7 +277,6 @@ func runServicesSetup(cfg SetupConfig) {
 		{Name: "Samba AD DC (Active Directory)", Status: "pending"},
 		{Name: "Keycloak (SSO / 인증)", Status: "pending"},
 		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
-		{Name: "OAuth2 Proxy (인증 게이트웨이)", Status: "pending"},
 		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"},
 		{Name: "Console 배포", Status: "pending"},
 		{Name: "Ingress 설정", Status: "pending"},
@@ -386,40 +385,17 @@ func runServicesSetup(cfg SetupConfig) {
 	mu.Unlock()
 	appendLog("success", fmt.Sprintf("프로비저닝 완료 (%ds)", provElapsed))
 
-	// Deploy OAuth2 Proxy (after provisioning — needs admin realm for OIDC discovery)
+	// Mark remaining steps done (Console & Ingress are deployed via manifest)
 	{
-		oauthNow := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Step = 5
-		progress.Message = "OAuth2 Proxy (인증 게이트웨이) 설치 중..."
-		progress.Steps[4].Status = "running"
-		progress.Steps[4].StartedAt = oauthNow
-		mu.Unlock()
-
-		appendLog("info", "OAuth2 Proxy 설치 중...")
-		if err := deployManifest("oauth2-proxy.yaml", "app=polyon-oauth2-proxy", tcfg, 120*time.Second); err != nil {
-			mu.Lock()
-			progress.Steps[4].Status = "error"
-			progress.Steps[4].Error = err.Error()
-			progress.State = "error"
-			progress.Message = "OAuth2 Proxy 설치 실패: " + err.Error()
-			mu.Unlock()
-			appendLog("error", "OAuth2 Proxy 설치 실패: "+err.Error())
-			return
-		}
-
-		oauthDone := time.Now().UnixMilli()
+		doneAt := time.Now().UnixMilli()
 		mu.Lock()
 		progress.Steps[4].Status = "done"
-		progress.Steps[4].DoneAt = oauthDone
+		progress.Steps[4].DoneAt = doneAt
 		progress.Steps[5].Status = "done"
-		progress.Steps[5].DoneAt = oauthDone
-		progress.Steps[6].Status = "done"
-		progress.Steps[6].DoneAt = oauthDone
+		progress.Steps[5].DoneAt = doneAt
 		progress.State = "phase_done"
 		progress.Message = "서비스 설치 완료"
 		mu.Unlock()
-		appendLog("success", fmt.Sprintf("OAuth2 Proxy 설치 완료 (%ds)", (oauthDone-oauthNow)/1000))
 	}
 
 	appendLog("success", "서비스 설치 완료 — 모든 구성 요소가 배포되었습니다")
