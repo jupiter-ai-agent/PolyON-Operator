@@ -1,3 +1,45 @@
+# ── PolyON Core ServiceAccount ──
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: polyon-core
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-core
+    app.kubernetes.io/part-of: polyon
+---
+# ── PolyON Core Role ──
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: polyon-core
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-core
+    app.kubernetes.io/part-of: polyon
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+# ── PolyON Core RoleBinding ──
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: polyon-core
+  namespace: {{.Namespace}}
+  labels:
+    app: polyon-core
+    app.kubernetes.io/part-of: polyon
+subjects:
+  - kind: ServiceAccount
+    name: polyon-core
+    namespace: {{.Namespace}}
+roleRef:
+  kind: Role
+  name: polyon-core
+  apiGroup: rbac.authorization.k8s.io
+---
 # ── PolyON Core Backend Service ──
 apiVersion: v1
 kind: Service
@@ -36,6 +78,7 @@ spec:
       labels:
         app: polyon-core
     spec:
+      serviceAccountName: polyon-core
       containers:
         - name: core
           image: jupitertriangles/polyon-core:v1.3.0
