@@ -100,6 +100,13 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Console 배포 완료")
 
+	// 10.5 Deploy Portal
+	appendLog("info", "Portal 배포 중...")
+	if err := deployManifest("portal.yaml", "app=polyon-portal", tcfg, 120*time.Second); err != nil {
+		return fmt.Errorf("deploy portal: %w", err)
+	}
+	appendLog("success", "Portal 배포 완료")
+
 	// 11. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")
 	mu.Lock()
