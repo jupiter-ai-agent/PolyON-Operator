@@ -185,7 +185,7 @@ spec:
     spec:
       containers:
         - name: console
-          image: jupitertriangles/polyon-console:v1.10.11
+          image: jupitertriangles/polyon-console:v1.10.12
           imagePullPolicy: Always
           ports:
             - containerPort: 80
