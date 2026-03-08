@@ -51,30 +51,5 @@ spec:
                 name: polyon-auth
                 port:
                   number: 8080
----
-# ── Ingress: Portal ──
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: polyon-portal-ingress
-  namespace: {{.Namespace}}
-  labels:
-    app.kubernetes.io/part-of: polyon
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-spec:
-  tls:
-    - hosts:
-        - {{.PortalDomain}}
-      secretName: polyon-tls
-  rules:
-    - host: {{.PortalDomain}}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: polyon-portal
-                port:
-                  number: 80
+
+# ── Portal Ingress: 추가 예정 (Portal 서비스 구현 시 활성화) ──
