@@ -81,9 +81,12 @@ spec:
             - |
               set -e
               PROVISIONED="/var/lib/samba/.provisioned"
+              SMB_CONF="/etc/samba/smb.conf"
+              SMB_BACKUP="/var/lib/samba/.smb.conf.bak"
+
               if [ ! -f "$PROVISIONED" ]; then
                 echo "[PolyON] Provisioning Samba AD DC: realm={{.DomainUpper}} domain={{.DomainNetBIOS}}"
-                rm -rf /etc/samba/smb.conf
+                rm -f "$SMB_CONF"
                 samba-tool domain provision \
                   --host-name="dc1" \
                   --realm="{{.DomainUpper}}" \
@@ -92,13 +95,28 @@ spec:
                   --server-role=dc \
                   --dns-backend=SAMBA_INTERNAL \
                   --use-rfc2307
+                # Allow plain LDAP bind for Keycloak/Stalwart
+                if grep -q '\[global\]' "$SMB_CONF" 2>/dev/null; then
+                  sed -i '/\[global\]/a\\tldap server require strong auth = no' "$SMB_CONF"
+                fi
+                # Backup smb.conf to PVC (survives restart)
+                cp "$SMB_CONF" "$SMB_BACKUP"
+                cp /etc/krb5.conf /var/lib/samba/.krb5.conf.bak 2>/dev/null || true
                 touch "$PROVISIONED"
                 echo "[PolyON] Samba AD DC provisioned successfully"
               else
-                echo "[PolyON] Samba AD DC already provisioned, starting..."
+                echo "[PolyON] Samba AD DC already provisioned, restoring config..."
+                # Restore smb.conf from PVC backup
+                if [ -f "$SMB_BACKUP" ]; then
+                  cp "$SMB_BACKUP" "$SMB_CONF"
+                  echo "[PolyON] smb.conf restored from PVC backup"
+                fi
+                if [ -f "/var/lib/samba/.krb5.conf.bak" ]; then
+                  cp /var/lib/samba/.krb5.conf.bak /etc/krb5.conf
+                fi
               fi
-              # Allow plain LDAP bind for Keycloak/Stalwart federation
-              sed -i '/\[global\]/a\\tldap server require strong auth = no' /var/lib/samba/private/smb.conf 2>/dev/null || sed -i '/\[global\]/a\\tldap server require strong auth = no' /etc/samba/smb.conf
+
+              echo "[PolyON] Starting Samba AD DC..."
               exec samba -F --no-process-group
           env:
             - name: SAMBA_REALM
