@@ -209,18 +209,28 @@ func createRealm(baseURL, token, realmName string) error {
 }
 
 func createOIDCClient(baseURL, token, realm, clientID, redirectDomain string) error {
-	// Extract base domain for wildcard (e.g., portal.cmars.com → *.cmars.com)
+	// Build explicit redirect URIs for portal + known service subdomains
 	parts := strings.SplitN(redirectDomain, ".", 2)
 	baseDomain := redirectDomain
 	if len(parts) > 1 {
 		baseDomain = parts[1]
+	}
+	// Portal + all potential service subdomains (Keycloak doesn't support *.domain wildcard)
+	subdomains := []string{"portal", "mail", "chat", "drive", "wiki", "git", "office", "erp", "bpm", "ai", "automation"}
+	redirectUris := make([]string, 0, len(subdomains)+1)
+	redirectUris = append(redirectUris, "https://"+redirectDomain+"/*")
+	for _, sub := range subdomains {
+		uri := "https://" + sub + "." + baseDomain + "/*"
+		if uri != "https://"+redirectDomain+"/*" {
+			redirectUris = append(redirectUris, uri)
+		}
 	}
 	payload := map[string]interface{}{
 		"clientId":     clientID,
 		"enabled":      true,
 		"publicClient": true,
 		"protocol":     "openid-connect",
-		"redirectUris":  []string{"https://" + redirectDomain + "/*", "https://*." + baseDomain + "/*"},
+		"redirectUris":  redirectUris,
 		"webOrigins":    []string{"+"},
 		"attributes": map[string]string{
 			"pkce.code.challenge.method": "S256",
