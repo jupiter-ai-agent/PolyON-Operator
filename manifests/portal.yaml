@@ -38,7 +38,7 @@ spec:
     spec:
       containers:
         - name: portal
-          image: jupitertriangles/polyon-portal:v1.0.1
+          image: jupitertriangles/polyon-portal:v1.0.2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
