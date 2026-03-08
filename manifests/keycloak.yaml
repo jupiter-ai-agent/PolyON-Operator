@@ -61,6 +61,8 @@ spec:
                 secretKeyRef:
                   name: polyon-common-secret
                   key: POLYON_KC_ADMIN_PASSWORD
+            - name: KC_HOSTNAME
+              value: "https://{{.AuthDomain}}"
             - name: KC_HEALTH_ENABLED
               value: "true"
             - name: KC_PROXY_HEADERS
