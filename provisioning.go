@@ -209,13 +209,19 @@ func createRealm(baseURL, token, realmName string) error {
 }
 
 func createOIDCClient(baseURL, token, realm, clientID, redirectDomain string) error {
+	// Extract base domain for wildcard (e.g., portal.cmars.com → *.cmars.com)
+	parts := strings.SplitN(redirectDomain, ".", 2)
+	baseDomain := redirectDomain
+	if len(parts) > 1 {
+		baseDomain = parts[1]
+	}
 	payload := map[string]interface{}{
 		"clientId":     clientID,
 		"enabled":      true,
 		"publicClient": true,
 		"protocol":     "openid-connect",
-		"redirectUris":  []string{"https://" + redirectDomain + "/*"},
-		"webOrigins":    []string{"https://" + redirectDomain},
+		"redirectUris":  []string{"https://" + redirectDomain + "/*", "https://*." + baseDomain + "/*"},
+		"webOrigins":    []string{"+"},
 		"attributes": map[string]string{
 			"pkce.code.challenge.method": "S256",
 		},

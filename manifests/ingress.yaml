@@ -52,6 +52,34 @@ spec:
                 port:
                   number: 8080
 ---
+# ── Ingress: Mail → Portal (user-facing landing page) ──
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: polyon-mail-portal
+  namespace: {{.Namespace}}
+  labels:
+    app.kubernetes.io/part-of: polyon
+    polyon.io/section: mail
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  tls:
+    - hosts:
+        - {{.MailDomain}}
+      secretName: polyon-tls
+  rules:
+    - host: {{.MailDomain}}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: polyon-portal
+                port:
+                  number: 80
+---
 # ── Ingress: Portal ──
 apiVersion: networking.k8s.io/v1
 kind: Ingress
