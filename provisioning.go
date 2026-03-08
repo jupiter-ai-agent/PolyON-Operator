@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -71,6 +73,14 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 		return fmt.Errorf("create LDAP federation in polyon: %w", err)
 	}
 	appendLog("success", fmt.Sprintf("polyon realm LDAP 페더레이션 완료 (id=%s)", fedID))
+
+	// 8.5. Ensure all AD users have mail attribute (required for Stalwart mail)
+	appendLog("info", "AD 사용자 메일 속성 자동 설정 중...")
+	if err := ensureADUserMailAttrs(&tcfg); err != nil {
+		appendLog("warn", "AD 메일 속성 설정 일부 실패 (비치명적): "+err.Error())
+	} else {
+		appendLog("success", "AD 사용자 메일 속성 설정 완료")
+	}
 
 	// 9. Trigger fullSync for polyon realm
 	appendLog("info", "polyon realm LDAP 동기화 중...")
@@ -342,4 +352,114 @@ func triggerLDAPSync(baseURL, token, realm, componentID string) error {
 		return fmt.Errorf("LDAP sync failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 	return nil
+}
+
+// ensureADUserMailAttrs ensures all AD DC users have a mail attribute.
+// Users without mail get {sAMAccountName}@{domain}.
+// System accounts (krbtgt, Guest) are skipped.
+func ensureADUserMailAttrs(tcfg *TemplateConfig) error {
+	namespace := tcfg.Namespace
+	domain := strings.ToLower(tcfg.Domain)
+	// Build BaseDN from domain parts: cmars.com → DC=cmars,DC=com
+	parts := strings.Split(domain, ".")
+	dnParts := make([]string, len(parts))
+	for i, p := range parts {
+		dnParts[i] = "DC=" + p
+	}
+	baseDN := strings.Join(dnParts, ",")
+
+	skipUsers := map[string]bool{
+		"krbtgt": true, "Guest": true, "guest": true,
+	}
+
+	// List AD users via kubectl exec → samba-tool user list
+	out, err := kubectlExec(namespace, "app=polyon-dc",
+		[]string{"samba-tool", "user", "list"})
+	if err != nil {
+		return fmt.Errorf("samba-tool user list: %w", err)
+	}
+
+	users := strings.Split(strings.TrimSpace(out), "\n")
+	var errors []string
+
+	for _, username := range users {
+		username = strings.TrimSpace(username)
+		if username == "" || skipUsers[username] {
+			continue
+		}
+
+		// Check if user already has mail attribute
+		showOut, err := kubectlExec(namespace, "app=polyon-dc",
+			[]string{"samba-tool", "user", "show", username})
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: show failed: %v", username, err))
+			continue
+		}
+
+		hasMail := false
+		for _, line := range strings.Split(showOut, "\n") {
+			if strings.HasPrefix(strings.TrimSpace(line), "mail:") {
+				hasMail = true
+				break
+			}
+		}
+
+		if hasMail {
+			appendLog("info", fmt.Sprintf("  %s: 메일 속성 이미 존재 — 건너뜀", username))
+			continue
+		}
+
+		// Set mail attribute via ldbmodify
+		mail := fmt.Sprintf("%s@%s", strings.ToLower(username), domain)
+		// Find the user's DN — typically CN=username,CN=Users,DC=...
+		userDN := fmt.Sprintf("CN=%s,CN=Users,%s", username, baseDN)
+
+		ldif := fmt.Sprintf("dn: %s\nchangetype: modify\nadd: mail\nmail: %s\n", userDN, mail)
+		_, err = kubectlExec(namespace, "app=polyon-dc",
+			[]string{"bash", "-c", fmt.Sprintf("echo '%s' | ldbmodify -H /var/lib/samba/private/sam.ldb", ldif)})
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: ldbmodify failed: %v", username, err))
+			continue
+		}
+		appendLog("info", fmt.Sprintf("  %s → %s 메일 속성 설정 완료", username, mail))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("%d errors: %s", len(errors), strings.Join(errors, "; "))
+	}
+	return nil
+}
+
+// kubectlExec runs a command in a pod via kubectl exec.
+func kubectlExec(namespace, labelSelector string, cmd []string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Get pod name
+	getPod := exec.CommandContext(ctx, "kubectl", "get", "pods",
+		"-n", namespace, "-l", labelSelector,
+		"-o", "jsonpath={.items[0].metadata.name}")
+	podNameBytes, err := getPod.Output()
+	if err != nil {
+		return "", fmt.Errorf("kubectl get pod (%s): %w", labelSelector, err)
+	}
+	podName := strings.TrimSpace(string(podNameBytes))
+	if podName == "" {
+		return "", fmt.Errorf("no pod found for selector %s", labelSelector)
+	}
+
+	args := []string{"exec", podName, "-n", namespace, "--"}
+	args = append(args, cmd...)
+	execCmd := exec.CommandContext(ctx, "kubectl", args...)
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+	if err := execCmd.Run(); err != nil {
+		errMsg := stderr.String()
+		if errMsg == "" {
+			errMsg = stdout.String()
+		}
+		return "", fmt.Errorf("%s", strings.TrimSpace(errMsg))
+	}
+	return strings.TrimSpace(stdout.String()), nil
 }
