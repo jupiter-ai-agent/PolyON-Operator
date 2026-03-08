@@ -93,7 +93,7 @@ spec:
       serviceAccountName: polyon-core
       containers:
         - name: core
-          image: jupitertriangles/polyon-core:v1.10.20
+          image: jupitertriangles/polyon-core:v1.10.21
           ports:
             - containerPort: 8000
           envFrom:
