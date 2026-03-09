@@ -1,0 +1,90 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polyon-opa-config
+  namespace: {{ .Namespace }}
+data:
+  default.rego: |
+    package polyon.authz
+
+    import rego.v1
+
+    default allow := false
+
+    allow if {
+      input.user != ""
+    }
+
+    is_admin if {
+      some role in input.roles
+      role == "admin"
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-opa
+  namespace: {{ .Namespace }}
+  labels:
+    app: polyon-opa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-opa
+  template:
+    metadata:
+      labels:
+        app: polyon-opa
+    spec:
+      containers:
+        - name: opa
+          image: openpolicyagent/opa:latest-static
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8181
+          args:
+            - "run"
+            - "--server"
+            - "--addr=0.0.0.0:8181"
+            - "--log-level=info"
+            - "/policies/default.rego"
+          volumeMounts:
+            - name: policies
+              mountPath: /policies/default.rego
+              subPath: default.rego
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8181
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8181
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: 64Mi
+              cpu: 50m
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: policies
+          configMap:
+            name: polyon-opa-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-opa
+  namespace: {{ .Namespace }}
+spec:
+  selector:
+    app: polyon-opa
+  ports:
+    - port: 8181
+      targetPort: 8181

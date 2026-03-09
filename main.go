@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -311,6 +312,9 @@ func runServicesSetup(cfg SetupConfig) {
 		{Name: "Samba AD DC (Active Directory)", Status: "pending"},
 		{Name: "Keycloak (SSO / 인증)", Status: "pending"},
 		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
+		{Name: "OPA (정책 엔진)", Status: "pending"},
+		{Name: "Gitea (Git 저장소)", Status: "pending"},
+		{Name: "AI Gateway (LiteLLM)", Status: "pending"},
 		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"},
 		{Name: "Console 배포", Status: "pending"},
 		{Name: "Ingress 설정", Status: "pending"},
@@ -390,13 +394,140 @@ func runServicesSetup(cfg SetupConfig) {
 		appendLog("success", fmt.Sprintf("%s 설치 완료 (%ds)", serviceNames[stepIdx], elapsed))
 	}
 
-	// Provisioning phase (must run before OAuth2 Proxy — realm must exist for OIDC discovery)
+	// Deploy OPA (Foundation #5)
+	{
+		stepIdx := 3
+		now := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Step = stepIdx + 1
+		progress.Message = "OPA (정책 엔진) 설치 중..."
+		progress.Steps[stepIdx].Status = "running"
+		progress.Steps[stepIdx].StartedAt = now
+		mu.Unlock()
+
+		appendLog("info", "OPA (정책 엔진) 설치 중...")
+		if err := deployManifest("opa.yaml", "app=polyon-opa", tcfg, 60*time.Second); err != nil {
+			mu.Lock()
+			progress.Steps[stepIdx].Status = "error"
+			progress.Steps[stepIdx].Error = err.Error()
+			progress.State = "error"
+			progress.Message = "OPA 설치 실패: " + err.Error()
+			mu.Unlock()
+			appendLog("error", "OPA 설치 실패: "+err.Error())
+			return
+		}
+		doneAt := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Steps[stepIdx].Status = "done"
+		progress.Steps[stepIdx].DoneAt = doneAt
+		mu.Unlock()
+		appendLog("success", fmt.Sprintf("OPA 설치 완료 (%ds)", (doneAt-now)/1000))
+	}
+
+	// Create Gitea + LiteLLM databases
+	appendLog("info", "Gitea/AI Gateway 데이터베이스 생성 중...")
+	for _, dbName := range []string{"polyon_gitea", "polyon_ai"} {
+		if _, err := kubectlExec(tcfg.Namespace, "app=polyon-db",
+			[]string{"psql", "-U", "polyon", "-d", "postgres", "-c",
+				fmt.Sprintf("SELECT 'exists' FROM pg_database WHERE datname='%s'", dbName)}); err == nil {
+			// Check if DB exists
+			out, _ := kubectlExec(tcfg.Namespace, "app=polyon-db",
+				[]string{"psql", "-U", "polyon", "-d", "postgres", "-tAc",
+					fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s'", dbName)})
+			if strings.TrimSpace(out) != "1" {
+				kubectlExec(tcfg.Namespace, "app=polyon-db",
+					[]string{"psql", "-U", "polyon", "-d", "postgres", "-c",
+						fmt.Sprintf("CREATE DATABASE %s OWNER polyon", dbName)})
+				appendLog("success", fmt.Sprintf("데이터베이스 %s 생성 완료", dbName))
+			} else {
+				appendLog("info", fmt.Sprintf("데이터베이스 %s 이미 존재", dbName))
+			}
+		}
+	}
+
+	// Deploy Gitea (Foundation #7)
+	{
+		stepIdx := 4
+		now := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Step = stepIdx + 1
+		progress.Message = "Gitea (Git 저장소) 설치 중..."
+		progress.Steps[stepIdx].Status = "running"
+		progress.Steps[stepIdx].StartedAt = now
+		mu.Unlock()
+
+		appendLog("info", "Gitea (Git 저장소) 설치 중...")
+		if err := deployManifest("gitea.yaml", "app=polyon-gitea", tcfg, 120*time.Second); err != nil {
+			mu.Lock()
+			progress.Steps[stepIdx].Status = "error"
+			progress.Steps[stepIdx].Error = err.Error()
+			progress.State = "error"
+			progress.Message = "Gitea 설치 실패: " + err.Error()
+			mu.Unlock()
+			appendLog("error", "Gitea 설치 실패: "+err.Error())
+			return
+		}
+		doneAt := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Steps[stepIdx].Status = "done"
+		progress.Steps[stepIdx].DoneAt = doneAt
+		mu.Unlock()
+		appendLog("success", fmt.Sprintf("Gitea 설치 완료 (%ds)", (doneAt-now)/1000))
+
+		// Create Gitea admin user
+		appendLog("info", "Gitea 관리자 계정 생성 중...")
+		_, err := kubectlExec(tcfg.Namespace, "app=polyon-gitea",
+			[]string{"su", "git", "-c",
+				fmt.Sprintf("gitea admin user create --admin --username polyon-admin --password '%s' --email admin@%s --config /data/gitea/conf/app.ini",
+					tcfg.GiteaAdminPassword, tcfg.Domain)})
+		if err != nil {
+			if strings.Contains(fmt.Sprint(err), "already exists") {
+				appendLog("info", "Gitea 관리자 계정 이미 존재")
+			} else {
+				appendLog("warn", "Gitea 관리자 계정 생성 실패 (비치명적): "+err.Error())
+			}
+		} else {
+			appendLog("success", "Gitea 관리자 계정 생성 완료 (polyon-admin)")
+		}
+	}
+
+	// Deploy LiteLLM (Foundation #8 — AI Gateway)
+	{
+		stepIdx := 5
+		now := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Step = stepIdx + 1
+		progress.Message = "AI Gateway (LiteLLM) 설치 중..."
+		progress.Steps[stepIdx].Status = "running"
+		progress.Steps[stepIdx].StartedAt = now
+		mu.Unlock()
+
+		appendLog("info", "AI Gateway (LiteLLM) 설치 중...")
+		if err := deployManifest("litellm.yaml", "app=polyon-ai", tcfg, 180*time.Second); err != nil {
+			mu.Lock()
+			progress.Steps[stepIdx].Status = "error"
+			progress.Steps[stepIdx].Error = err.Error()
+			progress.State = "error"
+			progress.Message = "AI Gateway 설치 실패: " + err.Error()
+			mu.Unlock()
+			appendLog("error", "AI Gateway 설치 실패: "+err.Error())
+			return
+		}
+		doneAt := time.Now().UnixMilli()
+		mu.Lock()
+		progress.Steps[stepIdx].Status = "done"
+		progress.Steps[stepIdx].DoneAt = doneAt
+		mu.Unlock()
+		appendLog("success", fmt.Sprintf("AI Gateway 설치 완료 (%ds)", (doneAt-now)/1000))
+	}
+
+	// Provisioning phase (must run before Console — realm must exist for OIDC discovery)
 	provNow := time.Now().UnixMilli()
 	mu.Lock()
-	progress.Step = 4
+	progress.Step = 7
 	progress.Message = "Keycloak 프로비저닝 (Realm, Client, LDAP) 진행 중..."
-	progress.Steps[3].Status = "running"
-	progress.Steps[3].StartedAt = provNow
+	progress.Steps[6].Status = "running"
+	progress.Steps[6].StartedAt = provNow
 	mu.Unlock()
 
 	appendLog("info", "Keycloak 프로비저닝 시작...")
@@ -414,19 +545,19 @@ func runServicesSetup(cfg SetupConfig) {
 	provDone := time.Now().UnixMilli()
 	provElapsed := (provDone - provNow) / 1000
 	mu.Lock()
-	progress.Steps[3].Status = "done"
-	progress.Steps[3].DoneAt = provDone
+	progress.Steps[6].Status = "done"
+	progress.Steps[6].DoneAt = provDone
 	mu.Unlock()
 	appendLog("success", fmt.Sprintf("프로비저닝 완료 (%ds)", provElapsed))
 
-	// Mark remaining steps done (Console & Ingress are deployed via manifest)
+	// Mark remaining steps done (Console & Ingress are deployed via runProvisioning)
 	{
 		doneAt := time.Now().UnixMilli()
 		mu.Lock()
-		progress.Steps[4].Status = "done"
-		progress.Steps[4].DoneAt = doneAt
-		progress.Steps[5].Status = "done"
-		progress.Steps[5].DoneAt = doneAt
+		progress.Steps[7].Status = "done"
+		progress.Steps[7].DoneAt = doneAt
+		progress.Steps[8].Status = "done"
+		progress.Steps[8].DoneAt = doneAt
 		progress.State = "phase_done"
 		progress.Message = "서비스 설치 완료"
 		mu.Unlock()

@@ -47,6 +47,8 @@ type TemplateConfig struct {
 	KCAdminPassword       string // Keycloak bootstrap admin
 	StalwartAdminPassword string // Stalwart fallback admin
 	RustFSSecretKey       string // RustFS secret key
+	LiteLLMMasterKey      string // LiteLLM AI Gateway master key
+	GiteaAdminPassword    string // Gitea admin password
 }
 
 // generatePassword creates a random alphanumeric password of given length
@@ -138,6 +140,8 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		KCAdminPassword:       generatePassword(24),
 		StalwartAdminPassword: generatePassword(24),
 		RustFSSecretKey:       generatePassword(24),
+		LiteLLMMasterKey:      "sk-polyon-" + generatePassword(24),
+		GiteaAdminPassword:    cfg.AdminPassword, // same as DC admin
 	}
 }
 
