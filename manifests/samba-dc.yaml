@@ -73,7 +73,7 @@ spec:
       hostname: dc1
       containers:
         - name: samba-dc
-          image: jupitertriangles/polyon-dc:v1.0.0
+          image: jupitertriangles/polyon-dc:{{ .DCVersion }}
           securityContext:
             privileged: true
           command: ["/bin/bash", "-c"]

@@ -50,7 +50,12 @@ type TemplateConfig struct {
 	RustFSSecretKey       string // RustFS secret key
 	LiteLLMMasterKey      string // LiteLLM AI Gateway master key
 	GiteaAdminPassword    string // Gitea admin password
-	AppEngineVersion           string // AppEngine image version (e.g. "v0.5.3")
+	AppEngineVersion           string // e.g. "v0.5.6"
+	DCVersion                  string // e.g. "v1.0.0"
+	MailVersion                string // e.g. "v1.0.0"
+	CoreVersion                string // e.g. "v1.14.2"
+	ConsoleVersion             string // e.g. "v1.10.16"
+	PortalVersion              string // e.g. "v0.2.0"
 	AppEngineClientSecret      string // Keycloak polyon-appengine client secret (set during provisioning)
 	AppEngineAdminClientSecret string // Keycloak polyon-appengine-admin client secret (admin realm)
 }
@@ -67,6 +72,27 @@ func generatePassword(length int) string {
 }
 
 // DomainToDC converts a domain like "cmars.com" to "DC=cmars,DC=com"
+// readVersionFile reads VERSION file embedded in the binary and returns a key→value map.
+// Falls back to defaults if not available.
+func readVersions() map[string]string {
+	defaults := map[string]string{
+		"core": "1.14.2", "console": "1.10.16", "portal": "0.2.0",
+		"operator": "0.7.9", "dc": "1.0.1", "mail": "1.0.0",
+		"appengine": "0.5.6", "chat": "1.0.0", "drive": "1.0.0",
+	}
+	data, err := os.ReadFile("VERSION")
+	if err != nil {
+		return defaults
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		parts := strings.SplitN(strings.TrimSpace(line), "=", 2)
+		if len(parts) == 2 {
+			defaults[parts[0]] = parts[1]
+		}
+	}
+	return defaults
+}
+
 func DomainToDC(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	dcs := make([]string, len(parts))
@@ -78,6 +104,7 @@ func DomainToDC(domain string) string {
 
 // NewTemplateConfig derives computed fields from SetupConfig
 func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
+	versions := readVersions()
 	domain := cfg.Domain
 	domainUpper := strings.ToUpper(domain)
 
@@ -151,7 +178,12 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		RustFSSecretKey:       generatePassword(24),
 		LiteLLMMasterKey:      "sk-polyon-" + generatePassword(24),
 		GiteaAdminPassword:    cfg.AdminPassword, // same as DC admin
-		AppEngineVersion:      "v0.5.6",
+		AppEngineVersion:      "v" + versions["appengine"],
+		DCVersion:             "v" + versions["dc"],
+		MailVersion:           "v" + versions["mail"],
+		CoreVersion:           "v" + versions["core"],
+		ConsoleVersion:        "v" + versions["console"],
+		PortalVersion:         "v" + versions["portal"],
 	}
 }
 

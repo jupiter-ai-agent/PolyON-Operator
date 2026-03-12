@@ -77,7 +77,7 @@ spec:
               mountPath: /config-source
       containers:
         - name: stalwart
-          image: jupitertriangles/polyon-mail:v1.0.0
+          image: jupitertriangles/polyon-mail:{{ .MailVersion }}
           ports:
             - containerPort: 25
             - containerPort: 587
