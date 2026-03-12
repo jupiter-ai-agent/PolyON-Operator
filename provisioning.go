@@ -59,6 +59,13 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-portal 클라이언트 생성 완료 (polyon realm)")
 
+	// 6.5 Create OIDC client "polyon-erpengine" in polyon realm
+	appendLog("info", "polyon-erpengine OIDC 클라이언트 생성 중...")
+	if err := createOIDCClient(keycloakURL, token, "polyon", "polyon-erpengine", "erp."+tcfg.Domain); err != nil {
+		return fmt.Errorf("create polyon-erpengine client: %w", err)
+	}
+	appendLog("success", "polyon-erpengine 클라이언트 생성 완료 (polyon realm)")
+
 	// 7. Create local admin user in admin realm (no LDAP)
 	appendLog("info", "admin realm 관리자 계정 생성 중...")
 	if err := createLocalUser(keycloakURL, token, "admin", "admin", tcfg.ConsoleAdminPassword); err != nil {
@@ -116,6 +123,13 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 		return fmt.Errorf("deploy portal: %w", err)
 	}
 	appendLog("success", "Portal 배포 완료")
+
+	// 10.6 Deploy ERPEngine (Foundation module)
+	appendLog("info", "ERPEngine 배포 중...")
+	if err := deployManifest("erpengine.yaml", "app=polyon-erpengine", tcfg, 180*time.Second); err != nil {
+		return fmt.Errorf("deploy erpengine: %w", err)
+	}
+	appendLog("success", "ERPEngine 배포 완료")
 
 	// 11. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")

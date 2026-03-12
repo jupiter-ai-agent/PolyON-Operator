@@ -1,0 +1,116 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: polyon-erpengine-data
+  namespace: {{ .Namespace }}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-erpengine
+  namespace: {{ .Namespace }}
+  labels:
+    app: polyon-erpengine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-erpengine
+  template:
+    metadata:
+      labels:
+        app: polyon-erpengine
+    spec:
+      containers:
+        - name: erpengine
+          image: jupitertriangles/polyon-erpengine:{{ .ERPEngineVersion }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8069
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: DB_PASSWORD
+            - name: ODOO_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-erpengine-secret
+                  key: ODOO_ADMIN_PASSWORD
+            - name: ODOO_DB_FILTER
+              value: "^polyon_erp$"
+            - name: ODOO_LIST_DB
+              value: "false"
+            - name: ODOO_PROXY_MODE
+              value: "true"
+            - name: ODOO_WORKERS
+              value: "2"
+          livenessProbe:
+            httpGet:
+              path: /web/health
+              port: 8069
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /web/health
+              port: 8069
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/odoo
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: polyon-erpengine-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-erpengine
+  namespace: {{ .Namespace }}
+spec:
+  selector:
+    app: polyon-erpengine
+  ports:
+    - port: 8069
+      targetPort: 8069
