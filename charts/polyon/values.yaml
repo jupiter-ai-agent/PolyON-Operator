@@ -1,0 +1,73 @@
+# ══════════════════════════════════════════════════════════════
+#  PolyON — values.yaml
+#  외부 subchart 없이 공식 이미지로 직접 정의
+# ══════════════════════════════════════════════════════════════
+
+# ── Global ──
+global:
+  domain: cmars.com
+
+# ── Phase 0: Infrastructure ──
+
+# ① PostgreSQL
+postgresql:
+  enabled: true
+  image: postgres:17-alpine
+  password: "polyon-admin-2026"
+  databases:
+    - keycloak
+    - stalwart
+    - gitea
+  storage: 10Gi
+
+# ② Redis
+redis:
+  enabled: true
+  image: redis:8-alpine
+  storage: 1Gi
+
+# ③ Elasticsearch
+elasticsearch:
+  enabled: true
+  image: elasticsearch:8.17.0
+  javaOpts: "-Xms512m -Xmx512m"
+  storage: 5Gi
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 200m
+    limits:
+      memory: 2Gi
+      cpu: "1"
+
+# ④ MinIO (S3 호환 오브젝트 스토리지)
+minio:
+  enabled: true
+  image: minio/minio:latest
+  rootUser: "polyon-admin"
+  rootPassword: "polyon-minio-2026"
+  storage: 10Gi
+
+# ── Phase 1: Services ──
+
+# ⑤ Samba AD DC
+sambaDC:
+  enabled: true
+  image: jupitertriangles/polyon-dc:v1.0.0
+  realm: CMARS.COM
+  domain: CMARS
+  adminPassword: "PolyON-Admin-2026"
+  storage: 2Gi
+
+# ⑥ Keycloak (SSO)
+keycloak:
+  enabled: true
+  image: quay.io/keycloak/keycloak:26.2
+  adminUser: "admin"
+  adminPassword: "PolyON-KC-Admin-2026"
+
+# ⑦ Stalwart Mail
+stalwart:
+  enabled: true
+  image: jupitertriangles/polyon-mail:v1.0.0
+  storage: 5Gi

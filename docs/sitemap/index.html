@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PolyON Console — Menu Structure (IBM Cloud Style)</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  background: #f4f4f4;
+  color: #161616;
+  line-height: 1.5;
+}
+
+/* ── Header ── */
+.header {
+  background: #161616;
+  color: #fff;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header__logo { font-weight: 600; font-size: 16px; }
+.header__logo span { color: #0f62fe; }
+.header__title { font-size: 14px; color: #c6c6c6; }
+.header__badge {
+  margin-left: auto;
+  background: #0f62fe;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+/* ── Layout Comparison ── */
+.compare {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: calc(100vh - 52px);
+}
+
+/* ── IBM-style Rail Nav (Left) ── */
+.rail {
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  padding: 8px 0;
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+}
+.rail__section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.32px;
+  color: #6f6f6f;
+  padding: 16px 16px 4px;
+  text-transform: uppercase;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 4px;
+}
+.rail__section:first-child { border-top: none; margin-top: 0; }
+.rail__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #161616;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-left: 3px solid transparent;
+}
+.rail__item:hover { background: #e8e8e8; }
+.rail__item--active { background: #e0e0e0; border-left-color: #0f62fe; font-weight: 600; }
+.rail__icon { width: 16px; height: 16px; flex-shrink: 0; }
+.rail__count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a8a8a8;
+  font-family: 'IBM Plex Mono';
+}
+
+/* ── Main Content ── */
+.main {
+  padding: 24px 32px 64px;
+  overflow-y: auto;
+}
+
+/* ── Stats ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: #e0e0e0;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: #fff;
+  padding: 20px;
+}
+.stat-card__label { font-size: 11px; color: #525252; text-transform: uppercase; letter-spacing: 0.32px; }
+.stat-card__value { font-size: 28px; font-weight: 600; margin-top: 4px; }
+.stat-card__sub { font-size: 11px; color: #6f6f6f; margin-top: 2px; }
+
+/* ── Depth Colors ── */
+:root {
+  --d-section: #161616;
+  --d-category: #0f62fe;
+  --d-menu: #0043ce;
+  --d-group: #6929c4;
+  --d-item: #1192e8;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.legend__title { font-size: 12px; font-weight: 600; color: #525252; }
+.legend__item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #525252; }
+.legend__dot { width: 10px; height: 10px; border-radius: 2px; }
+.legend__sep { width: 1px; height: 16px; background: #e0e0e0; }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 2px; font-weight: 500; }
+.tag--ok { background: #defbe6; color: #0e6027; }
+.tag--part { background: #fdf6dd; color: #8e6a00; }
+.tag--plan { background: #e8e8e8; color: #525252; }
+.tag--engine { background: #e8daff; color: #6929c4; }
+
+/* ── Section ── */
+.sec {
+  margin-bottom: 24px;
+  scroll-margin-top: 60px;
+}
+.sec__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--d-section);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.32px;
+}
+.sec__badge { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; font-size: 10px; }
+.sec__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  gap: 1px;
+  background: #e0e0e0;
+}
+
+/* ── Module Card ── */
+.mod {
+  background: #fff;
+}
+.mod__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-left: 4px solid var(--d-category);
+  background: #edf5ff;
+}
+.mod__title { font-size: 14px; font-weight: 600; color: var(--d-category); }
+.mod__path { font-family: 'IBM Plex Mono'; font-size: 10px; color: #6f6f6f; margin-left: auto; }
+.mod__desc { font-size: 11px; color: #525252; padding: 2px 16px 6px 20px; }
+
+/* ── Items ── */
+.items { padding: 2px 0 8px; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px 4px 20px;
+  font-size: 12px;
+}
+.row:hover { background: #f4f4f4; }
+.row--d2 { border-left: 3px solid var(--d-menu); padding-left: 17px; }
+.row--d4 { padding-left: 8px; font-size: 11px; }
+.dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.dot--d2 { background: var(--d-menu); }
+.dot--d3 { background: var(--d-group); }
+.dot--d4 { background: var(--d-item); }
+.row__label { flex: 1; }
+.row__path { font-family: 'IBM Plex Mono'; font-size: 9px; color: #a8a8a8; }
+
+/* ── Group ── */
+.grp {
+  padding: 4px 16px 2px 36px;
+  border-left: 3px solid var(--d-group);
+  margin: 3px 16px 3px 20px;
+  background: #f8f0ff;
+}
+.grp__title { font-size: 10px; font-weight: 600; color: var(--d-group); text-transform: uppercase; letter-spacing: 0.32px; margin-bottom: 1px; }
+
+.divider { height: 1px; background: #e8e8e8; margin: 3px 16px 3px 20px; }
+
+.footer {
+  text-align: center;
+  padding: 32px;
+  font-size: 11px;
+  color: #6f6f6f;
+  border-top: 1px solid #e0e0e0;
+  background: #fff;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header__logo">Triangle.s <span>PolyON</span></div>
+  <div class="header__title">Console Menu Structure — IBM Cloud Style</div>
+  <div style="display:flex;gap:0;margin-left:32px">
+    <div style="padding:8px 20px;font-size:13px;color:#fff;border-bottom:2px solid #0f62fe;cursor:pointer">Menu Sitemap</div>
+    <a href="diagram.html" style="padding:8px 20px;font-size:13px;color:#c6c6c6;text-decoration:none;border-bottom:2px solid transparent">Architecture Diagram</a>
+  </div>
+  <div class="header__badge" id="badge"></div>
+</div>
+
+<div class="compare">
+  <nav class="rail" id="rail"></nav>
+  <div class="main" id="main"></div>
+</div>
+
+<div class="footer">
+  PolyON Console Menu Sitemap — IBM Cloud Style Reorganization · 2026-03-06 · Triangle.s
+</div>
+
+<script>
+const S = { OK: 'ok', PART: 'part', PLAN: 'plan' };
+
+// ══════════════════════════════════════════════════════════════
+// IBM Cloud 스타일 7-Section 재편
+// 기존 15 카테고리 → 7 그룹
+// ══════════════════════════════════════════════════════════════
+const SITEMAP = [
+  // ──────────────────────────────────────────────
+  // 1. DASHBOARD
+  // ──────────────────────────────────────────────
+  {
+    id: 'dashboard', section: 'Dashboard', icon: '📊',
+    modules: [
+      {
+        title: 'Dashboard', path: '/', status: S.OK, desc: '시스템 전체 현황 · 빠른 실행 · 위젯',
+        items: [
+          { label: '빠른 실행 카드 (8종)', status: S.OK },
+          { label: '사용자 / 그룹 / OU / Computer 통계', status: S.OK },
+          { label: 'Domain Info', status: S.OK },
+          { label: '메일 서비스 현황', status: S.PART },
+          { label: '시스템 리소스 (CPU/Mem/Disk)', status: S.PART },
+          { label: 'Alerts 위젯', status: S.PLAN },
+          { label: 'Workstream Timeline 위젯', status: S.PLAN },
+          { label: '위젯 추가/편집/재배치', status: S.PLAN },
+        ]
+      }
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 2. ID & ACCESS (디렉터리 + 보안 통합)
+  // ──────────────────────────────────────────────
+  {
+    id: 'identity', section: 'ID & Access', icon: '👥',
+    modules: [
+      {
+        title: 'Users', path: '/users', status: S.OK, desc: 'AD 사용자 관리',
+        items: [
+          { label: '사용자 목록', path: '/users', status: S.OK },
+          { label: '사용자 상세 · 편집', path: '/users/:id', status: S.OK },
+          { label: '사용자 생성', path: '/users/create', status: S.OK },
+          { label: '비밀번호 초기화', path: '/users/:id/reset-pw', status: S.PLAN },
+          { label: '계정 비활성화/삭제', path: '/users/:id/disable', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Groups', path: '/groups', status: S.OK, desc: 'AD 그룹 관리',
+        items: [
+          { label: '그룹 목록', path: '/groups', status: S.OK },
+          { label: '그룹 상세 · 멤버 관리', path: '/groups/:id', status: S.OK },
+          { label: '그룹 생성', path: '/groups/create', status: S.OK },
+        ]
+      },
+      {
+        title: 'Organization Units', path: '/ous', status: S.OK, desc: 'AD OU 구조',
+        items: [
+          { label: 'OU 목록', path: '/ous', status: S.OK },
+          { label: 'OU 상세 · 편집', path: '/ous/:id', status: S.OK },
+          { label: 'OU 트리', path: '/ous/tree', status: S.OK },
+          { label: 'OU Contents (하위 객체)', path: '/ous/:id/contents', status: S.OK },
+        ]
+      },
+      {
+        title: 'Computers', path: '/computers', status: S.PLAN, desc: 'AD 컴퓨터 계정',
+        items: [
+          { label: '컴퓨터 목록', path: '/computers', status: S.PLAN },
+          { label: '컴퓨터 상세', path: '/computers/:id', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Directory Tree', path: '/tree', status: S.OK, desc: 'AD 전체 트리 시각화',
+        items: [
+          { label: 'AD 트리 뷰', path: '/tree', status: S.OK },
+        ]
+      },
+      {
+        title: 'Security & Compliance', path: '/security', status: S.PART, desc: '보안 · 감사 · 정책 · GPO',
+        items: [
+          { label: 'Audit Log', path: '/security', status: S.OK },
+          { label: 'Policies (OPA)', path: '/security/policies', status: S.PLAN, engine: 'OPA' },
+          { label: 'GPO 관리', path: '/security/gpo', status: S.PLAN },
+          { label: 'Access Control (ACL)', path: '/security/acl', status: S.PLAN },
+          { label: '접근 정책', path: '/security/access-policy', status: S.PLAN },
+          { label: '감사 로그 (ES)', path: '/security/audit-log', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Keycloak (IAM)', path: '/auth', status: S.OK, desc: '인증 · SSO · Realm · Client', engine: 'Keycloak',
+        items: [
+          { label: 'Admin Realm', status: S.OK },
+          { label: 'Helios Realm (사원)', status: S.OK },
+          { label: 'LDAP Federation', status: S.OK },
+          { label: 'Client 관리 (PKCE)', status: S.OK },
+          { label: 'Keycloak Admin Console', path: 'auth.cmars.com', status: S.OK },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 3. SERVICES (메일 / 채팅 / AI / 앱 / Wiki / Git)
+  // ──────────────────────────────────────────────
+  {
+    id: 'services', section: 'Services', icon: '📱',
+    modules: [
+      {
+        title: 'Mail', path: '/mail', status: S.PART, desc: '메일 서버 관리', engine: 'Stalwart',
+        items: [
+          { label: '개요', path: '/mail', status: S.PART },
+          { type: 'group', label: '디렉터리', children: [
+            { label: '계정', path: '/mail/accounts', status: S.PART },
+            { label: '그룹', path: '/mail/groups', status: S.PLAN },
+            { label: '메일링 리스트', path: '/mail/lists', status: S.PLAN },
+            { label: '도메인', path: '/mail/domains', status: S.PLAN },
+            { label: '역할', path: '/mail/roles', status: S.PLAN },
+            { label: '테넌트', path: '/mail/tenants', status: S.PLAN },
+            { label: 'API 키', path: '/mail/api-keys', status: S.PLAN },
+            { label: 'OAuth 클라이언트', path: '/mail/oauth-clients', status: S.PLAN },
+          ]},
+          { type: 'group', label: '큐 & 리포트', children: [
+            { label: '큐', path: '/mail/queue', status: S.PLAN },
+            { label: '발신 리포트', path: '/mail/queue-reports', status: S.PLAN },
+            { label: '수신 리포트', path: '/mail/reports', status: S.PLAN },
+          ]},
+          { type: 'group', label: '이력', children: [
+            { label: '수신 이력', path: '/mail/history-received', status: S.PLAN },
+            { label: '발송 시도', path: '/mail/history-delivery', status: S.PLAN },
+          ]},
+          { type: 'group', label: '로그 & 추적', children: [
+            { label: '로그', path: '/mail/logs', status: S.PLAN },
+            { label: 'Live Tracing', path: '/mail/live-tracing', status: S.PLAN },
+          ]},
+          { type: 'group', label: '스팸 관리', children: [
+            { label: '스팸 테스트', path: '/mail/spam-test', status: S.PLAN },
+            { label: '샘플 업로드', path: '/mail/spam-upload', status: S.PLAN },
+          ]},
+          { type: 'group', label: '트러블슈팅', children: [
+            { label: '전송 트러블슈팅', path: '/mail/troubleshoot', status: S.PLAN },
+            { label: 'DMARC 트러블슈팅', path: '/mail/dmarc-troubleshoot', status: S.PLAN },
+          ]},
+          { type: 'group', label: '관리', children: [
+            { label: 'TLS 인증서', path: '/mail/tls', status: S.PLAN },
+            { label: 'Sieve 필터', path: '/mail/sieve', status: S.PLAN },
+            { label: '유지보수', path: '/mail/maintenance', status: S.PLAN },
+            { label: '서버 설정', path: '/mail/config', status: S.PLAN },
+          ]},
+        ]
+      },
+      {
+        title: 'Chat', path: '/chat', status: S.PLAN, desc: '채팅 서버 관리', engine: 'Mattermost',
+        items: [
+          { label: '개요', path: '/chat', status: S.PLAN },
+          { label: '팀 관리', path: '/chat/teams', status: S.PLAN },
+          { label: '채널 관리', path: '/chat/channels', status: S.PLAN },
+          { label: '사용자 관리', path: '/chat/users', status: S.PLAN },
+          { label: '통합 (Webhooks/Bot)', path: '/chat/integrations', status: S.PLAN },
+          { label: '파일 관리', path: '/chat/files', status: S.PLAN },
+          { label: '서버 설정', path: '/chat/settings', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'AI Platform', path: '/ai', status: S.PLAN, desc: 'LLM · Agent · Memory', engine: 'n8n + Ollama',
+        items: [
+          { label: '대시보드', path: '/ai', status: S.PLAN },
+          { label: 'Models (LLM)', path: '/ai/models', status: S.PLAN },
+          { label: 'Agents', path: '/ai/agents', status: S.PLAN },
+          { label: 'Memory (Mem0)', path: '/ai/memory', status: S.PLAN },
+          { label: 'API Keys', path: '/ai/keys', status: S.PLAN },
+          { label: 'Usage', path: '/ai/usage', status: S.PLAN },
+          { label: 'Settings', path: '/ai/settings', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Applications', path: '/apps', status: S.PART, desc: '앱 카탈로그 · SSO',
+        items: [
+          { label: '앱 목록', path: '/apps', status: S.PART },
+          { label: 'SSO 설정', path: '/apps/sso-setup', status: S.PLAN },
+          { label: 'Homepage Sites', path: '/homepage/sites', status: S.PLAN, engine: 'Strapi' },
+          { label: 'Site 생성', path: '/homepage/create', status: S.PLAN, engine: 'Strapi' },
+          { label: '빌드 현황', path: '/homepage/build', status: S.PLAN, engine: 'Strapi' },
+        ]
+      },
+      {
+        title: 'Wiki', path: '/wiki', status: S.PLAN, desc: '지식 베이스 · 문서', engine: 'AFFiNE',
+        items: [
+          { label: '워크스페이스', path: '/wiki/workspaces', status: S.PLAN },
+          { label: '페이지 목록', path: '/wiki/pages', status: S.PLAN },
+          { label: '공유 설정', path: '/wiki/sharing', status: S.PLAN },
+          { label: '설정', path: '/wiki/settings', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Git', path: '/gitea', status: S.PLAN, desc: '코드 저장소', engine: 'Gitea',
+        items: [
+          { label: '저장소 목록', path: '/gitea/repos', status: S.PLAN },
+          { label: '사용자 관리', path: '/gitea/users', status: S.PLAN },
+          { label: '조직 관리', path: '/gitea/orgs', status: S.PLAN },
+          { label: '설정', path: '/gitea/settings', status: S.PLAN },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 4. AUTOMATION (워크플로우 + BPMN)
+  // ──────────────────────────────────────────────
+  {
+    id: 'automation', section: 'Automation', icon: '⚙️',
+    modules: [
+      {
+        title: 'Workflow (n8n)', path: '/automation', status: S.PLAN, desc: '워크플로우 자동화', engine: 'n8n',
+        items: [
+          { label: '개요', path: '/automation', status: S.PLAN },
+          { label: '워크플로우 목록', path: '/automation/workflows', status: S.PLAN },
+          { label: '실행 이력', path: '/automation/executions', status: S.PLAN },
+          { label: '자격 증명', path: '/automation/credentials', status: S.PLAN },
+          { label: '설정', path: '/automation/settings', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'BPMN (Operaton)', path: '/bpmn', status: S.PLAN, desc: '비즈니스 프로세스 엔진', engine: 'Operaton',
+        items: [
+          { label: '프로세스 정의', path: '/bpmn/processes', status: S.PLAN },
+          { label: '실행 중 인스턴스', path: '/bpmn/instances', status: S.PLAN },
+          { label: '태스크', path: '/bpmn/tasks', status: S.PLAN },
+          { label: '히스토리', path: '/bpmn/history', status: S.PLAN },
+          { label: '인시던트', path: '/bpmn/incidents', status: S.PLAN },
+          { label: '배포 관리', path: '/bpmn/deployments', status: S.PLAN },
+          { label: '의사결정 (DMN)', path: '/bpmn/decisions', status: S.PLAN },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 5. INFRASTRUCTURE (네트워크 / 컨테이너 / DB / 스토리지)
+  // ──────────────────────────────────────────────
+  {
+    id: 'infra', section: 'Infrastructure', icon: '🖥️',
+    modules: [
+      {
+        title: 'Networking', path: '/dns', status: S.PART, desc: 'DNS · DC · VPN · Firewall',
+        items: [
+          { label: 'DNS 레코드', path: '/dns', status: S.PART },
+          { label: 'Domain Controllers', path: '/dcs', status: S.OK },
+          { label: 'VPN', path: '/services/vpn', status: S.PLAN },
+          { label: 'Firewall Rules', path: '/services/firewall', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Containers', path: '/containers', status: S.PART, desc: 'K8s Pod · 토폴로지 · 리소스',
+        items: [
+          { label: 'Pod 목록', path: '/containers', status: S.PART },
+          { label: '토폴로지 맵', path: '/containers/topology', status: S.PART },
+          { label: '리소스 사용량', path: '/containers/resources', status: S.PLAN },
+          { label: 'Pod 로그 뷰어', path: '/containers/logs', status: S.PLAN },
+          { label: 'Pod 상세', path: '/containers/:id', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Database', path: '/databases', status: S.OK, desc: 'DB 관리 도구 (iframe 임베드)',
+        items: [
+          { label: 'PostgreSQL', path: '/databases/postgresql', status: S.OK, engine: 'pgweb' },
+          { label: 'Redis', path: '/databases/redis', status: S.OK, engine: 'redis-commander' },
+          { label: 'Elasticsearch', path: '/databases/elasticsearch', status: S.OK, engine: 'Elasticvue' },
+        ]
+      },
+      {
+        title: 'Storage', path: '/storage', status: S.PLAN, desc: '오브젝트 스토리지', engine: 'RustFS',
+        items: [
+          { label: '버킷 목록', path: '/storage/buckets', status: S.PLAN },
+          { label: '사용량', path: '/storage/usage', status: S.PLAN },
+          { label: '접근 정책', path: '/storage/policies', status: S.PLAN },
+          { label: 'Drive 현황', path: '/directory/drive', status: S.PLAN },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 6. OBSERVABILITY (모니터링 / Logs / Alerts)
+  // ──────────────────────────────────────────────
+  {
+    id: 'observability', section: 'Observability', icon: '📈',
+    modules: [
+      {
+        title: 'Monitoring', path: '/monitoring', status: S.PART, desc: '대시보드 · Alerts · Sentinel', engine: 'Grafana',
+        items: [
+          { label: '대시보드 (Grafana)', path: '/monitoring', status: S.PART },
+          { label: 'Alerts', path: '/monitoring/alerts', status: S.PLAN },
+          { label: 'Sentinel Agent', path: '/monitoring/sentinel', status: S.PLAN },
+          { label: 'Metrics Explorer', path: '/monitoring/metrics', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Logs', path: '/monitoring/logs', status: S.PLAN, desc: '로그 수집 · 검색 · 분석',
+        items: [
+          { label: '로그 검색', path: '/monitoring/logs', status: S.PLAN },
+          { label: '로그 대시보드', path: '/monitoring/log-dashboard', status: S.PLAN },
+          { label: '로그 알림 규칙', path: '/monitoring/log-alerts', status: S.PLAN },
+        ]
+      },
+    ]
+  },
+
+  // ──────────────────────────────────────────────
+  // 7. MANAGEMENT (설정 / Workstream)
+  // ──────────────────────────────────────────────
+  {
+    id: 'management', section: 'Management', icon: '🔧',
+    modules: [
+      {
+        title: 'Settings', path: '/settings', status: S.PART, desc: '시스템 설정 · 도메인 · TLS · 백업',
+        items: [
+          { label: '일반', path: '/settings', status: S.PART },
+          { label: '도메인', path: '/settings/domain', status: S.PART },
+          { label: 'TLS / 인증서', path: '/settings/tls', status: S.PART },
+          { label: '백업', path: '/settings/backup', status: S.PLAN },
+          { label: '시스템 정보', path: '/settings/sysinfo', status: S.PART },
+          { label: '서비스 인증 정보', path: '/settings/credentials', status: S.PLAN },
+          { label: '내 계정', path: '/settings/account', status: S.PLAN },
+          { label: '메일 발송 (SMTP)', path: '/settings/smtp', status: S.PLAN },
+          { label: '도메인 관리', path: '/settings/domain-mgmt', status: S.PLAN },
+          { label: '시스템 초기화', path: '/settings/reset', status: S.PLAN },
+          { label: '설정 이력', path: '/settings/config-history', status: S.PLAN },
+          { label: 'Git 미러링', path: '/settings/mirrors', status: S.PLAN },
+        ]
+      },
+      {
+        title: 'Workstream', path: '/workstream', status: S.PLAN, desc: '업무 중심 그룹웨어 — Context Engine',
+        items: [
+          { label: 'Work Timeline', path: '/workstream', status: S.PLAN },
+          { label: 'Workstream 생성', path: '/workstream/create', status: S.PLAN },
+          { label: '진행 중 업무', path: '/workstream/active', status: S.PLAN },
+          { label: '완료된 업무', path: '/workstream/completed', status: S.PLAN },
+          { label: '템플릿 관리', path: '/workstream/templates', status: S.PLAN },
+          { label: 'Context Engine', path: '/workstream/context', status: S.PLAN },
+          { label: '이벤트 설정', path: '/workstream/settings', status: S.PLAN },
+        ]
+      },
+    ]
+  },
+];
+
+// ── Count ──
+function count(data) {
+  let t=0,ok=0,pt=0,pl=0,mods=0;
+  data.forEach(s => s.modules.forEach(m => {
+    mods++;
+    (m.items||[]).forEach(i => {
+      if (i.type==='group') (i.children||[]).forEach(c => { t++; if(c.status===S.OK)ok++; else if(c.status===S.PART)pt++; else pl++; });
+      else { t++; if(i.status===S.OK)ok++; else if(i.status===S.PART)pt++; else pl++; }
+    });
+  }));
+  return {t,ok,pt,pl,mods,secs:data.length};
+}
+
+function tag(s,eng) {
+  let h='';
+  if(eng) h+=`<span class="tag tag--engine">${eng}</span> `;
+  if(s===S.OK) h+='<span class="tag tag--ok">✓</span>';
+  else if(s===S.PART) h+='<span class="tag tag--part">△</span>';
+  else h+='<span class="tag tag--plan">—</span>';
+  return h;
+}
+
+const c = count(SITEMAP);
+document.getElementById('badge').textContent=`${c.t} items · ${c.mods} modules · ${c.secs} sections`;
+
+// ── Rail ──
+let railHtml='';
+SITEMAP.forEach((s,i)=>{
+  const mc = s.modules.length;
+  railHtml+=`<div class="rail__item${i===0?' rail__item--active':''}" onclick="document.getElementById('sec-${s.id}').scrollIntoView({behavior:'smooth'})">
+    <span class="rail__icon">${s.icon}</span> ${s.section} <span class="rail__count">${mc}</span>
+  </div>`;
+});
+document.getElementById('rail').innerHTML=railHtml;
+
+// ── Main ──
+let html=`
+<div class="stats">
+  <div class="stat-card"><div class="stat-card__label">Sections</div><div class="stat-card__value">${c.secs}</div><div class="stat-card__sub">IBM Cloud style grouping</div></div>
+  <div class="stat-card"><div class="stat-card__label">Modules</div><div class="stat-card__value">${c.mods}</div><div class="stat-card__sub">1단 카테고리</div></div>
+  <div class="stat-card"><div class="stat-card__label">구현 ✓</div><div class="stat-card__value" style="color:#0e6027">${c.ok}</div><div class="stat-card__sub">${(c.ok/c.t*100).toFixed(0)}%</div></div>
+  <div class="stat-card"><div class="stat-card__label">부분 △</div><div class="stat-card__value" style="color:#8e6a00">${c.pt}</div><div class="stat-card__sub">${(c.pt/c.t*100).toFixed(0)}%</div></div>
+  <div class="stat-card"><div class="stat-card__label">미구현 —</div><div class="stat-card__value" style="color:#525252">${c.pl}</div><div class="stat-card__sub">${(c.pl/c.t*100).toFixed(0)}%</div></div>
+</div>
+<div class="legend">
+  <span class="legend__title">Depth:</span>
+  <div class="legend__item"><div class="legend__dot" style="background:var(--d-section)"></div>Section</div>
+  <div class="legend__item"><div class="legend__dot" style="background:var(--d-category)"></div>Category</div>
+  <div class="legend__item"><div class="legend__dot" style="background:var(--d-menu)"></div>Menu</div>
+  <div class="legend__item"><div class="legend__dot" style="background:var(--d-group)"></div>Group</div>
+  <div class="legend__item"><div class="legend__dot" style="background:var(--d-item)"></div>Item</div>
+  <div class="legend__sep"></div>
+  <span class="tag tag--ok">✓ 구현</span>
+  <span class="tag tag--part">△ 부분</span>
+  <span class="tag tag--plan">— 미구현</span>
+  <span class="tag tag--engine">Engine</span>
+</div>`;
+
+SITEMAP.forEach(s=>{
+  const ic=s.modules.reduce((n,m)=>n+(m.items||[]).reduce((nn,i)=>nn+(i.type==='group'?(i.children||[]).length:1),0),0);
+  html+=`<div class="sec" id="sec-${s.id}">
+  <div class="sec__head">${s.icon} ${s.section} <span class="sec__badge">${s.modules.length} modules · ${ic} items</span></div>
+  <div class="sec__grid">`;
+  s.modules.forEach(m=>{
+    html+=`<div class="mod"><div class="mod__head">
+      <div class="mod__title">${m.title}</div>
+      ${m.engine?`<span class="tag tag--engine">${m.engine}</span>`:''}
+      <div class="mod__path">${m.path||''}</div>
+      ${tag(m.status)}
+    </div>`;
+    if(m.desc) html+=`<div class="mod__desc">${m.desc}</div>`;
+    if(m.items&&m.items.length){
+      html+='<div class="items">';
+      m.items.forEach(i=>{
+        if(i.type==='group'){
+          html+=`<div class="grp"><div class="grp__title">${i.label}</div>`;
+          (i.children||[]).forEach(ch=>{
+            html+=`<div class="row row--d4"><div class="dot dot--d4"></div><div class="row__label">${ch.label}</div><div class="row__path">${ch.path||''}</div>${tag(ch.status,ch.engine)}</div>`;
+          });
+          html+='</div>';
+        } else {
+          html+=`<div class="row row--d2"><div class="dot dot--d2"></div><div class="row__label">${i.label}</div><div class="row__path">${i.path||''}</div>${tag(i.status,i.engine)}</div>`;
+        }
+      });
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  html+='</div></div>';
+});
+
+document.getElementById('main').innerHTML=html;
+</script>
+</body>
+</html>

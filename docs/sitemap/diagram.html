@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PolyON — Architecture Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'IBM Plex Sans', sans-serif; background: #f4f4f4; color: #161616; }
+
+.header {
+  background: #161616; color: #fff; padding: 12px 32px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 100;
+}
+.header__logo { font-weight: 600; font-size: 16px; }
+.header__logo span { color: #0f62fe; }
+.tabs { display: flex; gap: 0; margin-left: 32px; }
+.tab {
+  padding: 8px 20px; font-size: 13px; color: #c6c6c6;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+.tab--active { color: #fff; border-bottom-color: #0f62fe; }
+.tab a { color: inherit; text-decoration: none; }
+
+.container { max-width: 1600px; margin: 0 auto; padding: 24px 32px 64px; }
+
+/* ── Legend ── */
+.legend {
+  display: flex; gap: 16px; padding: 12px 16px; background: #fff;
+  border: 1px solid #e0e0e0; margin-bottom: 24px; flex-wrap: wrap; align-items: center;
+}
+.legend__title { font-size: 12px; font-weight: 600; color: #525252; }
+.legend__item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #525252; }
+.legend__dot { width: 12px; height: 12px; border-radius: 2px; }
+.legend__sep { width: 1px; height: 16px; background: #e0e0e0; }
+
+/* ── Diagram Canvas ── */
+svg { width: 100%; height: auto; }
+.node rect, .node-ss rect { rx: 4; ry: 4; }
+.label { font-family: 'IBM Plex Sans', sans-serif; font-size: 12px; fill: #fff; }
+.label-dark { fill: #161616; }
+.label-sm { font-size: 10px; }
+.label-mono { font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+.arrow { stroke: #697077; stroke-width: 1.5; fill: none; marker-end: url(#arrowhead); }
+.arrow-data { stroke: #0f62fe; stroke-width: 1.5; stroke-dasharray: 5,3; fill: none; marker-end: url(#arrowBlue); }
+.arrow-problem { stroke: #da1e28; stroke-width: 2; fill: none; marker-end: url(#arrowRed); }
+.zone { fill: #f4f4f4; stroke: #e0e0e0; stroke-width: 1; rx: 8; }
+.zone-label { font-size: 11px; fill: #6f6f6f; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.problem-badge { font-size: 9px; fill: #fff; font-weight: 600; }
+
+/* ── Detail Cards ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)); gap: 16px; margin-top: 32px; }
+.card { background: #fff; border: 1px solid #e0e0e0; }
+.card--problem { border-left: 4px solid #da1e28; }
+.card--ok { border-left: 4px solid #24a148; }
+.card--warn { border-left: 4px solid #f1c21b; }
+.card__head { padding: 12px 16px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; gap: 8px; }
+.card__title { font-size: 14px; font-weight: 600; }
+.card__tag { font-size: 10px; padding: 2px 8px; border-radius: 2px; font-weight: 500; }
+.card__tag--ok { background: #defbe6; color: #0e6027; }
+.card__tag--err { background: #fff1f1; color: #da1e28; }
+.card__tag--warn { background: #fdf6dd; color: #8e6a00; }
+.card__body { padding: 12px 16px; font-size: 12px; line-height: 1.6; }
+.card__body code { font-family: 'IBM Plex Mono'; background: #f4f4f4; padding: 1px 4px; border-radius: 2px; font-size: 11px; }
+.card__body ul { padding-left: 16px; margin-top: 4px; }
+.card__body li { margin-bottom: 2px; }
+.card__body .problem { color: #da1e28; font-weight: 500; }
+.card__body .ok { color: #0e6027; }
+
+.section-title {
+  font-size: 16px; font-weight: 600; margin: 32px 0 16px; padding-bottom: 8px;
+  border-bottom: 2px solid #161616;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header__logo">Triangle.s <span>PolyON</span></div>
+  <div class="tabs">
+    <div class="tab"><a href="index.html">Menu Sitemap</a></div>
+    <div class="tab tab--active">Architecture Diagram</div>
+  </div>
+</div>
+
+<div class="container">
+
+<div class="legend">
+  <span class="legend__title">범례:</span>
+  <div class="legend__item"><div class="legend__dot" style="background:#0f62fe"></div>Deployment (무상태)</div>
+  <div class="legend__item"><div class="legend__dot" style="background:#6929c4"></div>StatefulSet (상태)</div>
+  <div class="legend__item"><div class="legend__dot" style="background:#24a148"></div>정상</div>
+  <div class="legend__item"><div class="legend__dot" style="background:#da1e28"></div>문제 발견</div>
+  <div class="legend__item"><div class="legend__dot" style="background:#f1c21b"></div>미배포/미확인</div>
+  <div class="legend__sep"></div>
+  <div class="legend__item" style="font-size:10px;">── 요청 흐름 &nbsp; - - - 데이터 흐름 &nbsp; <span style="color:#da1e28">━━ 문제 경로</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- MAIN ARCHITECTURE DIAGRAM -->
+<!-- ════════════════════════════════════════════ -->
+<svg viewBox="0 0 1200 820" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#697077"/></marker>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0f62fe"/></marker>
+    <marker id="arrowRed" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#da1e28"/></marker>
+  </defs>
+
+  <!-- ── Zone: External ── -->
+  <rect class="zone" x="20" y="10" width="1160" height="70"/>
+  <text class="zone-label" x="40" y="30">External (Browser)</text>
+  <rect x="200" y="30" width="200" height="36" rx="4" fill="#393939"/>
+  <text class="label" x="300" y="53" text-anchor="middle">🌐 User Browser</text>
+  <rect x="500" y="30" width="280" height="36" rx="4" fill="#393939"/>
+  <text class="label label-mono" x="640" y="53" text-anchor="middle">console.cmars.com / auth.cmars.com</text>
+
+  <!-- ── Zone: Ingress ── -->
+  <rect class="zone" x="20" y="95" width="1160" height="70"/>
+  <text class="zone-label" x="40" y="115">Traefik Ingress (kube-system)</text>
+  <rect x="200" y="110" width="180" height="36" rx="4" fill="#0043ce"/>
+  <text class="label" x="290" y="133" text-anchor="middle">console.cmars.com</text>
+  <rect x="420" y="110" width="160" height="36" rx="4" fill="#0043ce"/>
+  <text class="label" x="500" y="133" text-anchor="middle">auth.cmars.com</text>
+  <rect x="620" y="110" width="170" height="36" rx="4" fill="#0043ce"/>
+  <text class="label" x="705" y="133" text-anchor="middle">portal.cmars.com</text>
+
+  <!-- TLS badge -->
+  <rect x="840" y="114" width="100" height="24" rx="3" fill="#24a148"/>
+  <text class="label" x="890" y="131" text-anchor="middle" font-size="10">TLS *.cmars.com</text>
+
+  <!-- Arrow: Browser → Ingress -->
+  <line class="arrow" x1="300" y1="66" x2="290" y2="108"/>
+
+  <!-- ══ Zone: polyon namespace ══ -->
+  <rect class="zone" x="20" y="180" width="1160" height="620" fill="#f9f9f9"/>
+  <text class="zone-label" x="40" y="200">namespace: polyon</text>
+
+  <!-- ── Console (nginx + SPA) ── -->
+  <rect x="60" y="215" width="260" height="100" rx="6" fill="#fff" stroke="#0f62fe" stroke-width="2"/>
+  <rect x="60" y="215" width="260" height="28" rx="6" fill="#0f62fe"/>
+  <text class="label" x="190" y="234" text-anchor="middle" font-weight="600">polyon-console (nginx)</text>
+  <text class="label-dark label-sm" x="70" y="260">React SPA + Reverse Proxy</text>
+  <text class="label-dark label-mono" x="70" y="275">/api/ → core:8000</text>
+  <text class="label-dark label-mono" x="70" y="288">/pgweb/ /redis/ /elasticvue/ /es-proxy/</text>
+  <text class="label-dark label-mono" x="70" y="301">/auth/ → auth:8080</text>
+
+  <!-- Arrow: Ingress → Console -->
+  <line class="arrow" x1="290" y1="146" x2="190" y2="213"/>
+
+  <!-- ── Core API ── -->
+  <rect x="370" y="215" width="260" height="100" rx="6" fill="#fff" stroke="#0f62fe" stroke-width="2"/>
+  <rect x="370" y="215" width="260" height="28" rx="6" fill="#0f62fe"/>
+  <text class="label" x="500" y="234" text-anchor="middle" font-weight="600">polyon-core (Go/Chi)</text>
+  <text class="label-dark label-sm" x="380" y="260">43 API handlers · OIDC middleware</text>
+  <text class="label-dark label-mono" x="380" y="275">:8000/api/v1/* → handlers</text>
+  <text class="label-dark label-mono" x="380" y="288">/mail-proxy → stalwart</text>
+  <text class="label-dark label-mono" x="380" y="301">/es-proxy → opensearch</text>
+
+  <!-- Arrow: Console → Core -->
+  <line class="arrow" x1="320" y1="265" x2="368" y2="265"/>
+  <text class="label-mono label-dark" x="325" y="260" font-size="9">/api/</text>
+
+  <!-- ── Keycloak ── -->
+  <rect x="680" y="215" width="200" height="70" rx="6" fill="#fff" stroke="#0f62fe" stroke-width="2"/>
+  <rect x="680" y="215" width="200" height="28" rx="6" fill="#0f62fe"/>
+  <text class="label" x="780" y="234" text-anchor="middle" font-weight="600">polyon-auth (Keycloak)</text>
+  <text class="label-dark label-mono" x="690" y="260">:8080 · admin + helios realm</text>
+  <text class="label-dark label-mono" x="690" y="275">OIDC PKCE · LDAP federation</text>
+
+  <!-- Arrow: Ingress → Keycloak -->
+  <line class="arrow" x1="500" y1="146" x2="780" y2="213"/>
+
+  <!-- Arrow: Console → Keycloak (/auth/) -->
+  <path class="arrow" d="M 320 250 Q 350 210, 678 250"/>
+  <text class="label-mono label-dark" x="480" y="210" font-size="9">/auth/</text>
+
+  <!-- ── Operator ── -->
+  <rect x="930" y="215" width="220" height="70" rx="6" fill="#fff" stroke="#f1c21b" stroke-width="2"/>
+  <rect x="930" y="215" width="220" height="28" rx="6" fill="#0f62fe"/>
+  <text class="label" x="1040" y="234" text-anchor="middle" font-weight="600">polyon-operator ✅</text>
+  <text class="label-dark label-mono" x="940" y="260">:1110 · Setup Wizard</text>
+  <text class="label-dark label-mono" x="940" y="275">ns: polyon-operator (별도)</text>
+
+  <!-- Warn badge: cross-namespace -->
+  <rect x="1080" y="218" width="66" height="16" rx="3" fill="#f1c21b"/>
+  <text class="problem-badge" x="1113" y="229" text-anchor="middle" fill="#161616">별도 NS</text>
+
+  <!-- ═══ Infrastructure Layer ═══ -->
+  <rect x="40" y="340" width="1120" height="2" fill="#e0e0e0"/>
+  <text class="zone-label" x="50" y="360" fill="#525252">Infrastructure (StatefulSet)</text>
+
+  <!-- PostgreSQL -->
+  <rect x="60" y="375" width="150" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="135" y="400" text-anchor="middle" font-weight="600">polyon-db</text>
+  <text class="label label-mono" x="135" y="420" text-anchor="middle" font-size="10">PostgreSQL 17.9 :5432</text>
+
+  <!-- Redis -->
+  <rect x="230" y="375" width="130" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="295" y="400" text-anchor="middle" font-weight="600">polyon-redis</text>
+  <text class="label label-mono" x="295" y="420" text-anchor="middle" font-size="10">Redis :6379</text>
+
+  <!-- OpenSearch -->
+  <rect x="380" y="375" width="150" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="455" y="400" text-anchor="middle" font-weight="600">polyon-search</text>
+  <text class="label label-mono" x="455" y="420" text-anchor="middle" font-size="10">OpenSearch :9200</text>
+
+  <!-- RustFS -->
+  <rect x="550" y="375" width="130" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="615" y="400" text-anchor="middle" font-weight="600">polyon-rustfs</text>
+  <text class="label label-mono" x="615" y="420" text-anchor="middle" font-size="10">S3 :9000</text>
+
+  <!-- Samba DC -->
+  <rect x="700" y="375" width="150" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="775" y="400" text-anchor="middle" font-weight="600">polyon-dc</text>
+  <text class="label label-mono" x="775" y="420" text-anchor="middle" font-size="10">Samba AD :389 :636</text>
+
+  <!-- Stalwart -->
+  <rect x="870" y="375" width="150" height="60" rx="6" fill="#6929c4"/>
+  <text class="label" x="945" y="400" text-anchor="middle" font-weight="600">polyon-mail</text>
+  <text class="label label-mono" x="945" y="420" text-anchor="middle" font-size="10">Stalwart :8080</text>
+
+  <!-- Core → Infrastructure arrows -->
+  <line class="arrow-data" x1="420" y1="315" x2="135" y2="373"/>
+  <line class="arrow-data" x1="450" y1="315" x2="295" y2="373"/>
+  <line class="arrow-data" x1="500" y1="315" x2="455" y2="373"/>
+  <line class="arrow-data" x1="550" y1="315" x2="615" y2="373"/>
+  <line class="arrow-data" x1="560" y1="315" x2="775" y2="373"/>
+  <line class="arrow-data" x1="580" y1="315" x2="945" y2="373"/>
+
+  <!-- Keycloak → DC (LDAP) -->
+  <line class="arrow-data" x1="780" y1="285" x2="775" y2="373"/>
+  <text class="label-mono label-dark" x="785" y="335" font-size="9">LDAP :389</text>
+
+  <!-- Stalwart → DC -->
+  <line class="arrow-data" x1="870" y1="405" x2="852" y2="405"/>
+
+  <!-- Stalwart → OpenSearch -->
+  <path class="arrow-data" d="M 900 435 Q 900 460, 455 460 L 455 437"/>
+  <text class="label-mono label-dark" x="650" y="456" font-size="9">FTS :9200</text>
+
+  <!-- ═══ DB Tools Layer ═══ -->
+  <rect x="40" y="460" width="1120" height="2" fill="#e0e0e0"/>
+  <text class="zone-label" x="50" y="480" fill="#525252">DB Management Tools (Deployment)</text>
+
+  <!-- pgweb -->
+  <rect x="60" y="495" width="150" height="50" rx="6" fill="#fff" stroke="#24a148" stroke-width="2"/>
+  <rect x="60" y="495" width="150" height="22" rx="6" fill="#24a148"/>
+  <text class="label" x="135" y="511" text-anchor="middle" font-size="11" font-weight="600">polyon-pgweb ✅</text>
+  <text class="label-dark label-mono" x="70" y="536">:8081 /pgweb/</text>
+
+  <!-- redis-commander -->
+  <rect x="230" y="495" width="180" height="50" rx="6" fill="#fff" stroke="#24a148" stroke-width="2"/>
+  <rect x="230" y="495" width="180" height="22" rx="6" fill="#24a148"/>
+  <text class="label" x="320" y="511" text-anchor="middle" font-size="11" font-weight="600">redis-commander ✅</text>
+  <text class="label-dark label-mono" x="240" y="536">:8081 /redis/</text>
+
+  <!-- elasticvue -->
+  <rect x="430" y="495" width="160" height="50" rx="6" fill="#fff" stroke="#24a148" stroke-width="2"/>
+  <rect x="430" y="495" width="160" height="22" rx="6" fill="#24a148"/>
+  <text class="label" x="510" y="511" text-anchor="middle" font-size="11" font-weight="600">elasticvue ✅</text>
+  <text class="label-dark label-mono" x="440" y="536">:8080 /elasticvue/</text>
+
+  <!-- pgweb → PostgreSQL -->
+  <line class="arrow-data" x1="135" y1="495" x2="135" y2="437"/>
+  <!-- redis-commander → Redis -->
+  <line class="arrow-data" x1="295" y1="495" x2="295" y2="437"/>
+  <!-- elasticvue → OpenSearch -->
+  <line class="arrow-data" x1="510" y1="495" x2="455" y2="437"/>
+
+  <!-- Console → DB tools -->
+  <path class="arrow" d="M 120 315 L 120 340 Q 120 360, 120 380 L 120 380" style="stroke:transparent"/>
+  <path class="arrow" d="M 100 315 Q 80 400, 100 493"/>
+  <text class="label-mono label-dark" x="55" y="420" font-size="9">/pgweb/</text>
+
+  <!-- ═══ ConfigMap / Secret Layer ═══ -->
+  <rect x="40" y="570" width="1120" height="2" fill="#e0e0e0"/>
+  <text class="zone-label" x="50" y="590" fill="#525252">ConfigMap / Secret</text>
+
+  <!-- common-config -->
+  <rect x="60" y="605" width="200" height="50" rx="6" fill="#fff" stroke="#0043ce" stroke-width="1.5"/>
+  <text class="label-dark" x="160" y="625" text-anchor="middle" font-weight="600" font-size="12">polyon-common-config</text>
+  <text class="label-dark label-mono" x="160" y="642" text-anchor="middle">26 env vars · envFrom all</text>
+
+  <!-- common-secret -->
+  <rect x="280" y="605" width="200" height="50" rx="6" fill="#fff" stroke="#da1e28" stroke-width="2"/>
+  <text class="label-dark" x="380" y="625" text-anchor="middle" font-weight="600" font-size="12">polyon-common-secret</text>
+  <text class="label-dark label-mono" x="380" y="642" text-anchor="middle">15 secrets · ⚠️ DB PW 불일치</text>
+  <!-- Problem badge -->
+  <rect x="440" y="608" width="36" height="14" rx="3" fill="#da1e28"/>
+  <text class="problem-badge" x="458" y="618" text-anchor="middle">불일치</text>
+
+  <!-- db-secret -->
+  <rect x="500" y="605" width="180" height="50" rx="6" fill="#fff" stroke="#6929c4" stroke-width="1.5"/>
+  <text class="label-dark" x="590" y="625" text-anchor="middle" font-weight="600" font-size="12">polyon-db-secret</text>
+  <text class="label-dark label-mono" x="590" y="642" text-anchor="middle">POSTGRES_PASSWORD (실제)</text>
+
+  <!-- console-nginx -->
+  <rect x="700" y="605" width="200" height="50" rx="6" fill="#fff" stroke="#f1c21b" stroke-width="2"/>
+  <text class="label-dark" x="800" y="625" text-anchor="middle" font-weight="600" font-size="12">console-nginx CM</text>
+  <text class="label-dark label-mono" x="800" y="642" text-anchor="middle">default.conf · ⚠️ 이중관리</text>
+
+  <!-- polyon-tls -->
+  <rect x="920" y="605" width="160" height="50" rx="6" fill="#fff" stroke="#24a148" stroke-width="1.5"/>
+  <text class="label-dark" x="1000" y="625" text-anchor="middle" font-weight="600" font-size="12">polyon-tls</text>
+  <text class="label-dark label-mono" x="1000" y="642" text-anchor="middle">*.cmars.com (2036)</text>
+
+  <!-- ═══ Problem Arrows ═══ -->
+  
+  <!-- Problem: /computers API mismatch -->
+  <rect x="680" y="300" width="180" height="30" rx="4" fill="#fff1f1" stroke="#da1e28" stroke-width="1"/>
+  <text class="label-dark" x="770" y="320" text-anchor="middle" font-size="10" fill="#da1e28">❌ /computers 404</text>
+  <path class="arrow-problem" d="M 320 260 Q 450 210, 678 310"/>
+
+  <!-- ═══ Volume layer ═══ -->
+  <rect x="40" y="680" width="1120" height="2" fill="#e0e0e0"/>
+  <text class="zone-label" x="50" y="700" fill="#525252">Persistent Volumes</text>
+
+  <rect x="60" y="715" width="120" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="120" y="738" text-anchor="middle">polyon-db-data</text>
+  <rect x="200" y="715" width="120" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="260" y="738" text-anchor="middle">polyon-redis</text>
+  <rect x="340" y="715" width="130" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="405" y="738" text-anchor="middle">polyon-search</text>
+  <rect x="490" y="715" width="120" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="550" y="738" text-anchor="middle">polyon-rustfs</text>
+  <rect x="630" y="715" width="130" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="695" y="738" text-anchor="middle">polyon-dc-data</text>
+  <rect x="780" y="715" width="130" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark label-mono" x="845" y="738" text-anchor="middle">polyon-mail</text>
+
+  <!-- PV arrows -->
+  <line class="arrow" x1="120" y1="713" x2="120" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+  <line class="arrow" x1="260" y1="713" x2="280" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+  <line class="arrow" x1="405" y1="713" x2="440" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+  <line class="arrow" x1="550" y1="713" x2="600" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+  <line class="arrow" x1="695" y1="713" x2="760" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+  <line class="arrow" x1="845" y1="713" x2="930" y2="437" style="stroke:#c6c6c6;stroke-dasharray:3,3"/>
+
+  <!-- ── Request flow numbers ── -->
+  <circle cx="290" cy="90" r="10" fill="#0f62fe"/>
+  <text class="label" x="290" y="94" text-anchor="middle" font-size="10" font-weight="700">1</text>
+  <circle cx="270" cy="180" r="10" fill="#0f62fe"/>
+  <text class="label" x="270" y="184" text-anchor="middle" font-size="10" font-weight="700">2</text>
+  <circle cx="345" cy="265" r="10" fill="#0f62fe"/>
+  <text class="label" x="345" y="269" text-anchor="middle" font-size="10" font-weight="700">3</text>
+</svg>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- PROBLEM DETAIL CARDS -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section-title">🔴 발견된 문제점</div>
+
+<div class="cards">
+  <div class="card card--warn">
+    <div class="card__head">
+      <div class="card__title">1. Operator Cross-Namespace 프록시</div>
+      <span class="card__tag card__tag--warn">Medium</span>
+    </div>
+    <div class="card__body">
+      <p>Operator는 <code>polyon-operator</code> namespace에 정상 배포 (<code>https://operator.cmars.com</code>)</p>
+      <ul>
+        <li>Console nginx: <code>/api/sentinel/*</code>, <code>/api/setup/*</code> → <code>polyon-operator:1110</code></li>
+        <li>Console은 <code>polyon</code> namespace → 다른 namespace의 short name DNS 미해석</li>
+        <li><strong>확인 필요:</strong> nginx.conf에서 Operator 프록시가 FQDN 사용하는지 확인</li>
+        <li><strong>해결:</strong> <code>polyon-operator.polyon-operator.svc.cluster.local:1110</code> 사용</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card--problem">
+    <div class="card__head">
+      <div class="card__title">2. /computers API 경로 불일치</div>
+      <span class="card__tag card__tag--err">High</span>
+    </div>
+    <div class="card__body">
+      <p class="problem">Dashboard StatCards가 <code>apiFetch('/computers')</code> 호출 → 404</p>
+      <ul>
+        <li>Console <code>dashboard.ts</code>: <code>apiFetch('/computers')</code> = <code>/api/v1/computers</code></li>
+        <li>Core 라우트: <code>/api/v1/domain/computers</code> (domain prefix 필요)</li>
+        <li><strong>영향:</strong> Dashboard 컴퓨터 수 표시 실패</li>
+        <li><strong>해결:</strong> Console에서 <code>/domain/computers</code>로 변경 또는 Core에 <code>/computers</code> alias 추가</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card--problem">
+    <div class="card__head">
+      <div class="card__title">3. Secret 비밀번호 불일치</div>
+      <span class="card__tag card__tag--warn">Medium</span>
+    </div>
+    <div class="card__body">
+      <p class="problem"><code>polyon-common-secret.POLYON_DB_PASSWORD</code> ≠ <code>polyon-db-secret.POSTGRES_PASSWORD</code></p>
+      <ul>
+        <li>common-secret: <code>6v9gjOQxf7WDhdhlBcE7s65x</code> (Operator 생성)</li>
+        <li>db-secret: <code>UURlOTFlcRJOoMlEKdIMZcbR</code> (실제 PG 비밀번호)</li>
+        <li>pgweb은 db-secret 직접 참조로 해결됨</li>
+        <li><strong>영향:</strong> Core가 common-secret 참조 시 DB 연결 실패 가능</li>
+        <li><strong>해결:</strong> Operator에서 DB Secret 생성 시 common-secret과 동기화</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card--warn">
+    <div class="card__head">
+      <div class="card__title">4. nginx.conf 이중 관리</div>
+      <span class="card__tag card__tag--warn">Medium</span>
+    </div>
+    <div class="card__body">
+      <ul>
+        <li><strong>이미지 내장:</strong> Docker 빌드 시 <code>console/nginx.conf</code> → <code>/etc/nginx/conf.d/default.conf</code></li>
+        <li><strong>ConfigMap:</strong> <code>polyon-console-nginx</code>가 같은 경로에 마운트하여 오버라이드</li>
+        <li>현재 두 파일 내용 동일 (동기화됨)</li>
+        <li><strong>위험:</strong> 이미지만 재빌드하고 ConfigMap 미수정 시 불일치 발생</li>
+        <li><strong>해결:</strong> 이미지에서 nginx.conf 제거하고 ConfigMap 단일화, 또는 빌드 스크립트에서 자동 동기화</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card--warn">
+    <div class="card__head">
+      <div class="card__title">5. Containers 페이지 API (K8s 전환)</div>
+      <span class="card__tag card__tag--warn">Medium</span>
+    </div>
+    <div class="card__body">
+      <ul>
+        <li><code>/api/v1/pods</code>, <code>/api/v1/pods/{name}/logs</code>, <code>/api/v1/pods/{name}/restart</code></li>
+        <li><code>/api/v1/services/topology</code>, <code>/api/v1/containers/volumes</code></li>
+        <li>Core의 <code>containers.go</code>가 Docker API 기반 → K8s에서 작동 여부 미확인</li>
+        <li><strong>영향:</strong> Containers 페이지 3개 (목록/토폴로지/리소스) 전부 불안정</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card--ok">
+    <div class="card__head">
+      <div class="card__title">6. 정상 작동 확인된 API</div>
+      <span class="card__tag card__tag--ok">OK</span>
+    </div>
+    <div class="card__body">
+      <ul>
+        <li class="ok">✅ <code>/api/v1/users</code> — 사용자 CRUD</li>
+        <li class="ok">✅ <code>/api/v1/groups</code> — 그룹 CRUD</li>
+        <li class="ok">✅ <code>/api/v1/ous</code> + <code>/ous/tree</code> + <code>/ous/contents</code></li>
+        <li class="ok">✅ <code>/api/v1/domain/info</code> + <code>/domain/dcs</code></li>
+        <li class="ok">✅ <code>/api/v1/apps</code></li>
+        <li class="ok">✅ <code>/api/v1/databases/status</code></li>
+        <li class="ok">✅ DB Tools: pgweb, redis-commander, elasticvue (nginx proxy)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- REQUEST FLOW DIAGRAM -->
+<!-- ════════════════════════════════════════════ -->
+<div class="section-title">📡 요청 흐름 (Request Flow)</div>
+
+<svg viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0f62fe"/></marker>
+    <marker id="ah3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#697077"/></marker>
+  </defs>
+
+  <!-- Flow 1: Page Load -->
+  <text x="20" y="30" font-weight="600" font-size="13" fill="#161616">① 페이지 로드</text>
+  <rect x="20" y="45" width="100" height="36" rx="4" fill="#393939"/>
+  <text class="label" x="70" y="68" text-anchor="middle" font-size="11">Browser</text>
+  <line x1="122" y1="63" x2="178" y2="63" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="180" y="45" width="80" height="36" rx="4" fill="#0043ce"/>
+  <text class="label" x="220" y="68" text-anchor="middle" font-size="10">Ingress</text>
+  <line x1="262" y1="63" x2="318" y2="63" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="320" y="45" width="120" height="36" rx="4" fill="#0f62fe"/>
+  <text class="label" x="380" y="68" text-anchor="middle" font-size="10">Console nginx</text>
+  <line x1="442" y1="63" x2="498" y2="63" stroke="#697077" stroke-width="1.5" marker-end="url(#ah3)"/>
+  <text x="460" y="55" font-size="9" fill="#697077">SPA</text>
+  <rect x="500" y="45" width="100" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark" x="550" y="68" text-anchor="middle" font-size="10">index.html</text>
+
+  <!-- Flow 2: API Call -->
+  <text x="20" y="120" font-weight="600" font-size="13" fill="#161616">② API 호출 (/api/v1/users)</text>
+  <rect x="20" y="135" width="100" height="36" rx="4" fill="#393939"/>
+  <text class="label" x="70" y="158" text-anchor="middle" font-size="11">React SPA</text>
+  <line x1="122" y1="153" x2="178" y2="153" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="128" y="145" font-size="9" fill="#0f62fe">Bearer token</text>
+  <rect x="180" y="135" width="120" height="36" rx="4" fill="#0f62fe"/>
+  <text class="label" x="240" y="158" text-anchor="middle" font-size="10">Console nginx</text>
+  <line x1="302" y1="153" x2="358" y2="153" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="310" y="145" font-size="9" fill="#0f62fe">/api/ proxy</text>
+  <rect x="360" y="135" width="120" height="36" rx="4" fill="#0f62fe"/>
+  <text class="label" x="420" y="158" text-anchor="middle" font-size="10">Core :8000</text>
+  <line x1="482" y1="153" x2="538" y2="153" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="488" y="145" font-size="9" fill="#0f62fe">OIDC verify</text>
+  <rect x="540" y="135" width="80" height="36" rx="4" fill="#6929c4"/>
+  <text class="label" x="580" y="158" text-anchor="middle" font-size="10">LDAP</text>
+  <line x1="622" y1="153" x2="678" y2="153" stroke="#697077" stroke-width="1.5" marker-end="url(#ah3)"/>
+  <rect x="680" y="135" width="100" height="36" rx="4" fill="#e8e8e8" stroke="#c6c6c6"/>
+  <text class="label-dark" x="730" y="158" text-anchor="middle" font-size="10">JSON Response</text>
+
+  <!-- Flow 3: DB Tool -->
+  <text x="20" y="210" font-weight="600" font-size="13" fill="#161616">③ DB 도구 iframe (/pgweb/)</text>
+  <rect x="20" y="225" width="100" height="36" rx="4" fill="#393939"/>
+  <text class="label" x="70" y="248" text-anchor="middle" font-size="11">iframe</text>
+  <line x1="122" y1="243" x2="178" y2="243" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="180" y="225" width="120" height="36" rx="4" fill="#0f62fe"/>
+  <text class="label" x="240" y="248" text-anchor="middle" font-size="10">Console nginx</text>
+  <line x1="302" y1="243" x2="358" y2="243" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <text x="310" y="235" font-size="9" fill="#0f62fe">/pgweb/ proxy</text>
+  <rect x="360" y="225" width="120" height="36" rx="4" fill="#24a148"/>
+  <text class="label" x="420" y="248" text-anchor="middle" font-size="10">pgweb :8081</text>
+  <line x1="482" y1="243" x2="538" y2="243" stroke="#0f62fe" stroke-width="2" marker-end="url(#ah2)"/>
+  <rect x="540" y="225" width="120" height="36" rx="4" fill="#6929c4"/>
+  <text class="label" x="600" y="248" text-anchor="middle" font-size="10">PostgreSQL</text>
+</svg>
+
+</div>
+</body>
+</html>

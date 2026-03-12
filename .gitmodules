@@ -1,0 +1,6 @@
+[submodule "dc"]
+	path = dc
+	url = https://github.com/jupiter-ai-agent/PolyON-DC.git
+[submodule "mail"]
+	path = mail
+	url = https://github.com/jupiter-ai-agent/PolyON-Mail.git

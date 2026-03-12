@@ -1,0 +1,101 @@
+{{- if .Values.elasticsearch.enabled }}
+# ── Elasticsearch Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-es
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-es
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: http
+    - port: 9300
+      targetPort: 9300
+      protocol: TCP
+      name: transport
+  selector:
+    app: polyon-es
+---
+# ── Elasticsearch StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-es
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-es
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  serviceName: polyon-es
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-es
+  template:
+    metadata:
+      labels:
+        app: polyon-es
+    spec:
+      initContainers:
+        # ES requires vm.max_map_count=262144; sysctl init container
+        - name: sysctl
+          image: busybox
+          command: ["sh", "-c", "sysctl -w vm.max_map_count=262144 || true"]
+          securityContext:
+            privileged: true
+      containers:
+        - name: elasticsearch
+          image: {{ .Values.elasticsearch.image }}
+          ports:
+            - containerPort: 9200
+            - containerPort: 9300
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: network.host
+              value: "0.0.0.0"
+            - name: ES_JAVA_OPTS
+              value: {{ .Values.elasticsearch.javaOpts | quote }}
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            requests:
+              memory: {{ .Values.elasticsearch.resources.requests.memory }}
+              cpu: {{ .Values.elasticsearch.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.elasticsearch.resources.limits.memory }}
+              cpu: {{ .Values.elasticsearch.resources.limits.cpu }}
+          volumeMounts:
+            - name: es-data
+              mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+    - metadata:
+        name: es-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.elasticsearch.storage }}
+{{- end }}

@@ -1,0 +1,160 @@
+# ── PP Module Manifest Spec v1 ──
+apiVersion: polyon.io/v1
+kind: Module
+
+# ── 기본 정보 ──
+metadata:
+  id: mattermost                    # 고유 식별자 (영문 소문자, 하이픈)
+  name: HELIOS Chat                 # 표시명
+  version: 2.0.3                   # 시맨틱 버전
+  category: engine                  # engine | ai | process | monitoring
+  icon: Chat                        # @carbon/icons-react 컴포넌트명
+  accent: "#0058CC"                 # 테마 색상
+  description: "팀 메신저 · 채널 기반 소통"
+  vendor: Triangle.s                # 제작사 (선택)
+  license: MIT                      # 라이선스 (선택)
+
+spec:
+  engine: mattermost                # 기반 기술명
+
+  # ── 의존성 ──
+  requires:                         # 필수 — 없으면 설치 거부 (Foundation은 항상 존재)
+    - id: postgresql
+      reason: "채팅 데이터 저장"
+    - id: keycloak
+      reason: "SSO 인증 연동"
+
+  optional:                         # 선택 — 있으면 연동, 없으면 무시
+    - id: opensearch
+      feature: "메시지 전문검색"
+
+  # ── K8s 리소스 ──
+  resources:
+    statefulset: false              # true면 StatefulSet, false면 Deployment (기본: false)
+
+    image: jupitertriangles/polyon-chat:v2.0.3
+    replicas: 1
+    command: ["bin/mattermost", "server"]
+    
+    ports:
+      - name: http
+        containerPort: 8065
+
+    env:
+      - name: MM_SQLSETTINGS_DRIVERNAME
+        value: postgres
+      - name: MM_SQLSETTINGS_DATASOURCE
+        valueFrom:
+          secretKeyRef:
+            name: polyon-module-mattermost
+            key: DATABASE_URL
+      - name: MM_SERVICESETTINGS_ENABLEAPIACCESSTOKENS
+        value: "true"
+
+    health:
+      path: /api/v4/system/ping
+      port: 8065
+      initialDelay: 30
+      period: 10
+
+    resources:
+      requests: { cpu: 100m, memory: 256Mi }
+      limits: { cpu: 500m, memory: 1Gi }
+
+    pvc:                             # 영구 데이터 (선택)
+      - name: data
+        size: 10Gi
+        mountPath: /mattermost/data
+
+    configMaps: []                   # 추가 ConfigMap (선택)
+
+  # ── 네트워크 ──
+  ingress:
+    subdomain: chat                  # → chat.{base_domain}
+    port: 8065
+    annotations: {}                  # 추가 Ingress 어노테이션 (선택)
+
+  # ── DB 프로비저닝 ──
+  database:
+    create: true                     # true면 자동 CREATE DATABASE
+    name: mattermost                 # DB 이름
+    user: mattermost                 # DB 유저 (자동 생성)
+    migrations: auto                 # auto = 엔진 자체 마이그레이션
+
+  # ── AD/LDAP 자동 바인딩 ──
+  ldap:
+    bind: true                       # true면 설치 시 AD DC 자동 연동
+    engine: mattermost               # 엔진별 프로비저닝 핸들러 선택
+    settings:                        # 엔진별 LDAP 매핑 (Mattermost API 형식)
+      UserFilter: "(&(objectClass=user)(!(objectClass=computer))(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+      UsernameAttribute: sAMAccountName
+      IdAttribute: sAMAccountName
+      LoginIdAttribute: sAMAccountName
+      FirstNameAttribute: givenName
+      LastNameAttribute: sn
+      EmailAttribute: mail
+      NicknameAttribute: displayName
+      PositionAttribute: title
+      LoginFieldName: "AD 계정"
+
+  # ── OIDC 클라이언트 ──
+  oidc:
+    create: true                     # true면 Keycloak에 자동 등록
+    realm: helios
+    clientId: mattermost
+    publicClient: false
+    redirectUris:
+      - "https://chat.cmars.com/*"
+    webOrigins:
+      - "https://chat.cmars.com"
+
+  # ── Admin Console UI ──
+  admin:
+    nav:
+      title: Mattermost
+      section: SERVICES              # SERVICES | INFRASTRUCTURE | GOVERNANCE | SYSTEM
+      icon: Chat                     # @carbon/icons-react 이름
+      defaultPath: /chat
+      sortOrder: 20                  # 섹션 내 정렬 순서
+      items:
+        - label: 개요
+          path: /chat
+          icon: Chat
+        - type: divider
+        - label: 팀 관리
+          path: /chat/teams
+          icon: UserMultiple
+        - label: 채널 관리
+          path: /chat/channels
+          icon: Chat
+        - label: 사용자 관리
+          path: /chat/users
+          icon: User
+        - type: divider
+        - label: 서버 설정
+          path: /chat/settings
+          icon: Settings
+
+    ui:
+      entry: entry.js
+      pages:
+        - path: /chat
+          component: ChatPage
+        - path: /chat/teams
+          component: ChatTeamsPage
+        - path: /chat/channels
+          component: ChatChannelsPage
+        - path: /chat/users
+          component: ChatUsersPage
+        - path: /chat/settings
+          component: ChatSettingsPage
+
+  # ── 삭제 정책 ──
+  uninstall:
+    confirm: true                    # 삭제 확인 다이얼로그
+    dataPolicy: ask                  # ask | keepAll | deleteAll
+    resources:                       # 삭제 대상 리스트
+      databases: [mattermost]
+      pvcs: [polyon-mattermost-data]
+      oidcClients: [mattermost]
+      secrets: [polyon-module-mattermost]

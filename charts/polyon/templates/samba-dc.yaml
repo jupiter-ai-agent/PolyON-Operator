@@ -1,0 +1,154 @@
+{{- if .Values.sambaDC.enabled }}
+# ── Samba AD DC Secret ──
+apiVersion: v1
+kind: Secret
+metadata:
+  name: polyon-dc-secret
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-dc
+    {{- include "polyon.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  SAMBA_ADMIN_PASSWORD: {{ .Values.sambaDC.adminPassword | quote }}
+---
+# ── Samba AD DC Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-dc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-dc
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 389
+      targetPort: 389
+      protocol: TCP
+      name: ldap
+    - port: 636
+      targetPort: 636
+      protocol: TCP
+      name: ldaps
+    - port: 53
+      targetPort: 53
+      protocol: TCP
+      name: dns-tcp
+    - port: 53
+      targetPort: 53
+      protocol: UDP
+      name: dns-udp
+    - port: 88
+      targetPort: 88
+      protocol: TCP
+      name: kerberos
+    - port: 445
+      targetPort: 445
+      protocol: TCP
+      name: smb
+  selector:
+    app: polyon-dc
+---
+# ── Samba AD DC StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-dc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-dc
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  serviceName: polyon-dc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-dc
+  template:
+    metadata:
+      labels:
+        app: polyon-dc
+    spec:
+      hostname: dc1
+      containers:
+        - name: samba-dc
+          image: {{ .Values.sambaDC.image }}
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              PROVISIONED="/var/lib/samba/.provisioned"
+              if [ ! -f "$PROVISIONED" ]; then
+                echo "[PolyON] Provisioning Samba AD DC: realm=${SAMBA_REALM} domain=${SAMBA_DOMAIN}"
+                rm -rf /etc/samba/smb.conf
+                samba-tool domain provision \
+                  --realm="${SAMBA_REALM}" \
+                  --domain="${SAMBA_DOMAIN}" \
+                  --adminpass="${SAMBA_ADMIN_PASSWORD}" \
+                  --server-role=dc \
+                  --dns-backend=SAMBA_INTERNAL \
+                  --use-rfc2307
+                touch "$PROVISIONED"
+                echo "[PolyON] Samba AD DC provisioned successfully"
+              else
+                echo "[PolyON] Samba AD DC already provisioned, starting..."
+              fi
+              exec samba -F --no-process-group
+          env:
+            - name: SAMBA_REALM
+              value: {{ .Values.sambaDC.realm | quote }}
+            - name: SAMBA_DOMAIN
+              value: {{ .Values.sambaDC.domain | quote }}
+            - name: SAMBA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: polyon-dc-secret
+                  key: SAMBA_ADMIN_PASSWORD
+            - name: SAMBA_HOST
+              value: "polyon-dc"
+          ports:
+            - containerPort: 389
+            - containerPort: 636
+            - containerPort: 53
+              protocol: TCP
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 88
+            - containerPort: 445
+          readinessProbe:
+            tcpSocket:
+              port: 389
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+          volumeMounts:
+            - name: samba-data
+              mountPath: /var/lib/samba
+            - name: samba-conf
+              mountPath: /etc/samba/external
+  volumeClaimTemplates:
+    - metadata:
+        name: samba-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.sambaDC.storage }}
+    - metadata:
+        name: samba-conf
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Mi
+{{- end }}

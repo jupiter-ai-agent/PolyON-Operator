@@ -1,0 +1,83 @@
+{{- if .Values.keycloak.enabled }}
+# ── Keycloak Service ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-auth
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: polyon-auth
+---
+# ── Keycloak Deployment ──
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polyon-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-auth
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-auth
+  template:
+    metadata:
+      labels:
+        app: polyon-auth
+    spec:
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image }}
+          args: ["start-dev"]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: "jdbc:postgresql://polyon-db:5432/keycloak"
+            - name: KC_DB_USERNAME
+              value: "postgres"
+            - name: KC_DB_PASSWORD
+              value: {{ .Values.postgresql.password | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.keycloak.adminUser | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: {{ .Values.keycloak.adminPassword | quote }}
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: "xforwarded"
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: 512Mi
+              cpu: 200m
+            limits:
+              memory: 1.5Gi
+              cpu: "1"
+{{- end }}

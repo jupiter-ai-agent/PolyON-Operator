@@ -1,0 +1,99 @@
+{{- if .Values.minio.enabled }}
+# ── MinIO Secret ──
+apiVersion: v1
+kind: Secret
+metadata:
+  name: polyon-minio-secret
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-minio
+    {{- include "polyon.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  MINIO_ROOT_USER: {{ .Values.minio.rootUser | quote }}
+  MINIO_ROOT_PASSWORD: {{ .Values.minio.rootPassword | quote }}
+---
+# ── MinIO Service (API) ──
+apiVersion: v1
+kind: Service
+metadata:
+  name: polyon-minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-minio
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+      name: api
+    - port: 9001
+      targetPort: 9001
+      protocol: TCP
+      name: console
+  selector:
+    app: polyon-minio
+---
+# ── MinIO StatefulSet ──
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: polyon-minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: polyon-minio
+    {{- include "polyon.labels" . | nindent 4 }}
+spec:
+  serviceName: polyon-minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polyon-minio
+  template:
+    metadata:
+      labels:
+        app: polyon-minio
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+            - containerPort: 9001
+          envFrom:
+            - secretRef:
+                name: polyon-minio-secret
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+              cpu: 500m
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage }}
+{{- end }}

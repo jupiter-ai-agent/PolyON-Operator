@@ -1,0 +1,20 @@
+apiVersion: v2
+name: polyon
+description: PolyON — K8s 기반 통합 그룹웨어 플랫폼
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - groupware
+  - identity
+  - sso
+  - keycloak
+  - active-directory
+
+home: https://gitlab.triangles.co.kr/cmars/polyon
+maintainers:
+  - name: Triangle.s
+    url: https://gitlab.triangles.co.kr
+
+# 외부 subchart 의존성 없음 — 공식 이미지로 직접 정의
