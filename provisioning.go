@@ -506,6 +506,13 @@ stringData:
   OIDC_TOKEN_ENDPOINT_INTERNAL: "http://polyon-auth.%s.svc.cluster.local:8080/realms/polyon/protocol/openid-connect/token"
   OIDC_JWKS_URI: "https://%s/realms/polyon/protocol/openid-connect/certs"
   OIDC_JWKS_URI_INTERNAL: "http://polyon-auth.%s.svc.cluster.local:8080/realms/polyon/protocol/openid-connect/certs"
+  LDAP_HOST: "polyon-dc"
+  LDAP_PORT: "389"
+  LDAP_BASE_DN: "%s"
+  LDAP_USERS_DN: "CN=Users,%s"
+  LDAP_GROUPS_DN: "%s"
+  LDAP_BIND_DN: "CN=Administrator,CN=Users,%s"
+  LDAP_BIND_PASSWORD: "%s"
   ADMIN_OIDC_ISSUER: "https://%s/realms/admin"
   ADMIN_OIDC_CLIENT_ID: "polyon-appengine-admin"
   ADMIN_OIDC_CLIENT_SECRET: "%s"
@@ -513,6 +520,7 @@ stringData:
 		tcfg.AuthDomain, tcfg.AppEngineClientSecret,
 		tcfg.AuthDomain, tcfg.AuthDomain,
 		tcfg.Namespace, tcfg.AuthDomain, tcfg.Namespace,
+		tcfg.DomainDC, tcfg.DomainDC, tcfg.DomainDC, tcfg.DomainDC, tcfg.AdminPassword,
 		tcfg.AuthDomain, tcfg.AppEngineAdminClientSecret)
 
 	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
