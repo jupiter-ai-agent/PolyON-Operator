@@ -317,7 +317,7 @@ func runServicesSetup(cfg SetupConfig) {
 		{Name: "AI Gateway (LiteLLM)", Status: "pending"},
 		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"},
 		{Name: "Console 배포", Status: "pending"},
-		{Name: "ERPEngine (ERP 엔진)", Status: "pending"},
+		{Name: "AppEngine (ERP 엔진)", Status: "pending"},
 		{Name: "Ingress 설정", Status: "pending"},
 	}
 

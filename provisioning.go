@@ -59,14 +59,14 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-portal 클라이언트 생성 완료 (polyon realm)")
 
-	// 6.5 Create confidential OIDC client "polyon-erpengine" in polyon realm + get secret
-	appendLog("info", "polyon-erpengine OIDC 클라이언트 생성 중...")
-	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-erpengine", "erp."+tcfg.Domain)
+	// 6.5 Create confidential OIDC client "polyon-appengine" in polyon realm + get secret
+	appendLog("info", "polyon-appengine OIDC 클라이언트 생성 중...")
+	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", "erp."+tcfg.Domain)
 	if err != nil {
-		return fmt.Errorf("create polyon-erpengine client: %w", err)
+		return fmt.Errorf("create polyon-appengine client: %w", err)
 	}
-	tcfg.ERPEngineClientSecret = erpClientSecret
-	appendLog("success", "polyon-erpengine 클라이언트 생성 완료 (polyon realm)")
+	tcfg.AppEngineClientSecret = erpClientSecret
+	appendLog("success", "polyon-appengine 클라이언트 생성 완료 (polyon realm)")
 
 	// 7. Create local admin user in admin realm (no LDAP)
 	appendLog("info", "admin realm 관리자 계정 생성 중...")
@@ -126,20 +126,20 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "Portal 배포 완료")
 
-	// 10.6 Deploy ERPEngine (Foundation module)
-	// ERPEngine DB + Secret 프로비저닝
-	appendLog("info", "ERPEngine DB 생성 중...")
-	if err := provisionERPEngineDB(tcfg); err != nil {
-		appendLog("warn", "ERPEngine DB 생성 실패 (비치명적): "+err.Error())
+	// 10.6 Deploy AppEngine (Foundation module)
+	// AppEngine DB + Secret 프로비저닝
+	appendLog("info", "AppEngine DB 생성 중...")
+	if err := provisionAppEngineDB(tcfg); err != nil {
+		appendLog("warn", "AppEngine DB 생성 실패 (비치명적): "+err.Error())
 	} else {
-		appendLog("success", "ERPEngine DB 생성 완료")
+		appendLog("success", "AppEngine DB 생성 완료")
 	}
 
-	appendLog("info", "ERPEngine 배포 중...")
-	if err := deployManifest("erpengine.yaml", "app=polyon-erpengine", tcfg, 180*time.Second); err != nil {
-		return fmt.Errorf("deploy erpengine: %w", err)
+	appendLog("info", "AppEngine 배포 중...")
+	if err := deployManifest("appengine.yaml", "app=polyon-appengine", tcfg, 180*time.Second); err != nil {
+		return fmt.Errorf("deploy appengine: %w", err)
 	}
-	appendLog("success", "ERPEngine 배포 완료")
+	appendLog("success", "AppEngine 배포 완료")
 
 	// 11. Deploy Ingress
 	appendLog("info", "Ingress 배포 중...")
@@ -504,8 +504,8 @@ func kubectlExec(namespace, labelSelector string, cmd []string) (string, error) 
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// provisionERPEngineDB creates the polyon_erp database and K8s Secret for ERPEngine.
-func provisionERPEngineDB(tcfg TemplateConfig) error {
+// provisionAppEngineDB creates the polyon_erp database and K8s Secret for AppEngine.
+func provisionAppEngineDB(tcfg TemplateConfig) error {
 	// 1. Create PostgreSQL database via kubectl exec
 	createDBSQL := "CREATE DATABASE polyon_erp OWNER polyon;"
 	_, err := kubectlExec(tcfg.Namespace, "app=polyon-db",
@@ -515,14 +515,14 @@ func provisionERPEngineDB(tcfg TemplateConfig) error {
 	}
 	appendLog("info", "  polyon_erp DB 생성 완료 (또는 이미 존재)")
 
-	// 2. Create K8s Secret: polyon-erpengine-secret
+	// 2. Create K8s Secret: polyon-appengine-secret
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	secretYAML := fmt.Sprintf(`apiVersion: v1
 kind: Secret
 metadata:
-  name: polyon-erpengine-secret
+  name: polyon-appengine-secret
   namespace: %s
 type: Opaque
 stringData:
@@ -533,13 +533,13 @@ stringData:
   DB_PASSWORD: "%s"
   ODOO_ADMIN_PASSWORD: "%s"
   OIDC_ISSUER: "https://auth.%s/realms/polyon"
-  OIDC_CLIENT_ID: "polyon-erpengine"
+  OIDC_CLIENT_ID: "polyon-appengine"
   OIDC_CLIENT_SECRET: "%s"
   OIDC_AUTH_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/auth"
   OIDC_TOKEN_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/token"
   OIDC_JWKS_URI: "https://auth.%s/realms/polyon/protocol/openid-connect/certs"
 `, tcfg.Namespace, tcfg.DBPassword, tcfg.ConsoleAdminPassword,
-		tcfg.Domain, tcfg.ERPEngineClientSecret,
+		tcfg.Domain, tcfg.AppEngineClientSecret,
 		tcfg.Domain, tcfg.Domain, tcfg.Domain)
 
 	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
@@ -549,12 +549,12 @@ stringData:
 	if err := applyCmd.Run(); err != nil {
 		return fmt.Errorf("create secret: %s", strings.TrimSpace(stderr.String()))
 	}
-	appendLog("info", "  polyon-erpengine-secret 생성 완료")
+	appendLog("info", "  polyon-appengine-secret 생성 완료")
 	return nil
 }
 
 // createConfidentialOIDCClient creates a confidential OIDC client in KC and returns its secret.
-// Used for server-side apps (like ERPEngine/Odoo) that need client_secret for OIDC flows.
+// Used for server-side apps (like AppEngine/Odoo) that need client_secret for OIDC flows.
 func createConfidentialOIDCClient(baseURL, token, realm, clientID, redirectDomain string) (string, error) {
 	payload := map[string]interface{}{
 		"clientId":     clientID,

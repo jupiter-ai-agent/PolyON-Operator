@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: polyon-erpengine-data
+  name: polyon-appengine-data
   namespace: {{ .Namespace }}
 spec:
   accessModes: [ReadWriteOnce]
@@ -13,29 +13,29 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: polyon-erpengine
+  name: polyon-appengine
   namespace: {{ .Namespace }}
   labels:
-    app: polyon-erpengine
+    app: polyon-appengine
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: polyon-erpengine
+      app: polyon-appengine
   template:
     metadata:
       labels:
-        app: polyon-erpengine
+        app: polyon-appengine
     spec:
       containers:
-        - name: erpengine
-          image: jupitertriangles/polyon-erpengine:{{ .ERPEngineVersion }}
+        - name: appengine
+          image: jupitertriangles/polyon-appengine:{{ .AppEngineVersion }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8069
           envFrom:
             - secretRef:
-                name: polyon-erpengine-secret
+                name: polyon-appengine-secret
           env:
             - name: ODOO_DB_FILTER
               value: "^polyon_erp$"
@@ -74,16 +74,16 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: polyon-erpengine-data
+            claimName: polyon-appengine-data
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: polyon-erpengine
+  name: polyon-appengine
   namespace: {{ .Namespace }}
 spec:
   selector:
-    app: polyon-erpengine
+    app: polyon-appengine
   ports:
     - port: 8069
       targetPort: 8069
