@@ -323,8 +323,8 @@ func runServicesSetup(cfg SetupConfig) {
 	}
 
 	deploys := []serviceStep{
-		{manifest: "samba-dc.yaml", labelSelector: "app=polyon-dc", timeout: 180 * time.Second},
-		{manifest: "keycloak.yaml", labelSelector: "app=polyon-auth", timeout: 180 * time.Second},
+		{manifest: "samba-dc.yaml", labelSelector: "app=polyon-dc", timeout: 300 * time.Second},
+		{manifest: "keycloak.yaml", labelSelector: "app=polyon-auth", timeout: 300 * time.Second},
 		{manifest: "stalwart-config.yaml", labelSelector: "", timeout: 0},
 		{manifest: "stalwart.yaml", labelSelector: "app=polyon-mail", timeout: 120 * time.Second},
 	}
