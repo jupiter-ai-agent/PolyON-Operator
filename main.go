@@ -425,7 +425,19 @@ func runServicesSetup(cfg SetupConfig) {
 	// ── 3: Keycloak 프로비저닝 ───────────────────────────────────
 	// KC가 완전히 기동된 직후 프로비저닝 (이후 앱들이 KC OIDC를 사용할 수 있도록)
 	if err := runStep(3, "Keycloak 프로비저닝 (Realm, Client, LDAP)", true, func() error {
-		return runProvisioning(cfg, tcfg)
+		updated, err := runProvisioning(cfg, tcfg)
+		if err != nil {
+			return err
+		}
+		// KC 프로비저닝에서 생성된 클라이언트 secret을 tcfg에 반영
+		mu.Lock()
+		tcfg = updated
+		if cachedTemplateConfig != nil {
+			cachedTemplateConfig.AppEngineClientSecret = updated.AppEngineClientSecret
+			cachedTemplateConfig.AppEngineAdminClientSecret = updated.AppEngineAdminClientSecret
+		}
+		mu.Unlock()
+		return nil
 	}); err != nil {
 		return
 	}

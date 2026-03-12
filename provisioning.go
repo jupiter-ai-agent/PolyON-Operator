@@ -14,48 +14,48 @@ import (
 )
 
 // runProvisioning configures Keycloak realms, clients, LDAP federation, and deploys Ingress + Console
-func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
+func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) (TemplateConfig, error) {
 	keycloakURL := fmt.Sprintf("http://polyon-auth.%s.svc.cluster.local:8080", tcfg.Namespace)
 
 	// 1. Wait for Keycloak to be ready
 	appendLog("info", "Keycloak 준비 대기 중...")
 	if err := waitForKeycloak(keycloakURL, 5*time.Minute); err != nil {
-		return fmt.Errorf("keycloak not ready: %w", err)
+		return TemplateConfig{}, fmt.Errorf("keycloak not ready: %w", err)
 	}
 	appendLog("success", "Keycloak 준비 완료")
 
 	// 2. Get admin token (use KCAdminPassword — matches KC_BOOTSTRAP_ADMIN_PASSWORD)
 	token, err := getKeycloakToken(keycloakURL, tcfg.KCAdminPassword)
 	if err != nil {
-		return fmt.Errorf("get admin token: %w", err)
+		return TemplateConfig{}, fmt.Errorf("get admin token: %w", err)
 	}
 	appendLog("success", "Keycloak 관리자 토큰 획득")
 
 	// 3. Create "admin" realm
 	appendLog("info", "admin Realm 생성 중...")
 	if err := createRealm(keycloakURL, token, "admin"); err != nil {
-		return fmt.Errorf("create admin realm: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create admin realm: %w", err)
 	}
 	appendLog("success", "admin Realm 생성 완료")
 
 	// 4. Create "polyon" realm
 	appendLog("info", "polyon Realm 생성 중...")
 	if err := createRealm(keycloakURL, token, "polyon"); err != nil {
-		return fmt.Errorf("create polyon realm: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create polyon realm: %w", err)
 	}
 	appendLog("success", "polyon Realm 생성 완료")
 
 	// 5. Create OIDC client "polyon-console" in admin realm
 	appendLog("info", "polyon-console OIDC 클라이언트 생성 중...")
 	if err := createOIDCClient(keycloakURL, token, "admin", "polyon-console", tcfg.ConsoleDomain); err != nil {
-		return fmt.Errorf("create polyon-console client: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create polyon-console client: %w", err)
 	}
 	appendLog("success", "polyon-console 클라이언트 생성 완료 (admin realm)")
 
 	// 6. Create OIDC client "polyon-portal" in polyon realm
 	appendLog("info", "polyon-portal OIDC 클라이언트 생성 중...")
 	if err := createOIDCClient(keycloakURL, token, "polyon", "polyon-portal", tcfg.PortalDomain); err != nil {
-		return fmt.Errorf("create polyon-portal client: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create polyon-portal client: %w", err)
 	}
 	appendLog("success", "polyon-portal 클라이언트 생성 완료 (polyon realm)")
 
@@ -63,7 +63,7 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	appendLog("info", "polyon-appengine OIDC 클라이언트 생성 중...")
 	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", tcfg.AppEngineDomain)
 	if err != nil {
-		return fmt.Errorf("create polyon-appengine client: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create polyon-appengine client: %w", err)
 	}
 	tcfg.AppEngineClientSecret = erpClientSecret
 	appendLog("success", "polyon-appengine 클라이언트 생성 완료 (polyon realm)")
@@ -72,7 +72,7 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	appendLog("info", "polyon-appengine-admin OIDC 클라이언트 생성 중...")
 	appEngineAdminSecret, err := createConfidentialOIDCClient(keycloakURL, token, "admin", "polyon-appengine-admin", tcfg.ConsoleDomain)
 	if err != nil {
-		return fmt.Errorf("create polyon-appengine-admin client: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create polyon-appengine-admin client: %w", err)
 	}
 	tcfg.AppEngineAdminClientSecret = appEngineAdminSecret
 	appendLog("success", "polyon-appengine-admin 클라이언트 생성 완료 (admin realm)")
@@ -80,7 +80,7 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	// 7. Create local admin user in admin realm (no LDAP)
 	appendLog("info", "admin realm 관리자 계정 생성 중...")
 	if err := createLocalUser(keycloakURL, token, "admin", "admin", tcfg.ConsoleAdminPassword); err != nil {
-		return fmt.Errorf("create admin user in admin realm: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create admin user in admin realm: %w", err)
 	}
 	appendLog("success", "admin realm 관리자 계정 생성 완료 (admin)")
 
@@ -88,21 +88,21 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	appendLog("info", "polyon realm LDAP 페더레이션 설정 중...")
 	fedID, err := createLDAPFederation(keycloakURL, token, "polyon", tcfg)
 	if err != nil {
-		return fmt.Errorf("create LDAP federation in polyon: %w", err)
+		return TemplateConfig{}, fmt.Errorf("create LDAP federation in polyon: %w", err)
 	}
 	appendLog("success", fmt.Sprintf("polyon realm LDAP 페더레이션 완료 (id=%s)", fedID))
 
 	// 8.3 Add LDAP Group Mapper — memberOf → KC groups
 	appendLog("info", "LDAP Group Mapper 추가 중...")
 	if err := addLDAPGroupMapper(keycloakURL, token, "polyon", fedID, tcfg); err != nil {
-		return fmt.Errorf("add LDAP group mapper: %w", err)
+		return TemplateConfig{}, fmt.Errorf("add LDAP group mapper: %w", err)
 	}
 	appendLog("success", "LDAP Group Mapper 추가 완료")
 
 	// 8.4 Add groups claim mapper to polyon-appengine client → groups in JWT
 	appendLog("info", "polyon-appengine groups claim mapper 추가 중...")
 	if err := addGroupsClaimMapper(keycloakURL, token, "polyon", "polyon-appengine"); err != nil {
-		return fmt.Errorf("add groups claim mapper: %w", err)
+		return TemplateConfig{}, fmt.Errorf("add groups claim mapper: %w", err)
 	}
 	appendLog("success", "polyon-appengine groups claim mapper 추가 완료")
 
@@ -117,12 +117,12 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	// 9. Trigger fullSync for polyon realm
 	appendLog("info", "polyon realm LDAP 동기화 중...")
 	if err := triggerLDAPSync(keycloakURL, token, "polyon", fedID); err != nil {
-		return fmt.Errorf("LDAP sync in polyon: %w", err)
+		return TemplateConfig{}, fmt.Errorf("LDAP sync in polyon: %w", err)
 	}
 	appendLog("success", "polyon realm LDAP 동기화 완료")
 
 	appendLog("success", "Keycloak 프로비저닝 완료")
-	return nil
+	return tcfg, nil
 }
 
 func waitForKeycloak(baseURL string, timeout time.Duration) error {
