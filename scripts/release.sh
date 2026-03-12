@@ -44,7 +44,7 @@ load_versions() {
 
 save_versions() {
   : > "$VERSION_FILE"
-  for key in core console portal operator dc mail appengine; do
+  for key in core console portal operator dc mail appengine chat drive; do
     [[ -n "${VER[$key]:-}" ]] && echo "$key=${VER[$key]}" >> "$VERSION_FILE"
   done
 }
@@ -127,6 +127,24 @@ build_mail() {
   docker build --platform "$PLATFORM" -t "$tag" .
   docker push "$tag"
   log "Mail ✓"
+}
+
+build_chat() {
+  local tag="$REGISTRY/polyon-chat:v${VER[chat]}"
+  step "Chat v${VER[chat]}"
+  cd "${REPO_ROOT}/../polyon-chat"
+  docker build --platform "$PLATFORM" -t "$tag" .
+  docker push "$tag"
+  log "Chat ✓"
+}
+
+build_drive() {
+  local tag="$REGISTRY/polyon-drive:v${VER[drive]}"
+  step "Drive v${VER[drive]}"
+  cd "${REPO_ROOT}/../PolyON-Drive"
+  docker build --platform "$PLATFORM" -t "$tag" .
+  docker push "$tag"
+  log "Drive ✓"
 }
 
 # ── Manifest sync ──────────────────────────────────────────────────────────
@@ -218,7 +236,7 @@ main() {
     case "$arg" in
       --bump)           do_bump=true ;;
       --status|--dry-run) do_status=true ;;
-      core|console|portal|operator|dc|mail|appengine) targets+=("$arg") ;;
+      core|console|portal|operator|dc|mail|appengine|chat|drive) targets+=("$arg") ;;
       all) targets=(core console portal operator) ;;
       *) err "Unknown: $arg"; exit 1 ;;
     esac
@@ -255,6 +273,8 @@ main() {
       dc)        build_dc ;;
       mail)      build_mail ;;
       appengine) warn "AppEngine은 PolyON-AppEngine 리포에서 별도 빌드" ;;
+      chat)      build_chat ;;
+      drive)     build_drive ;;
     esac
   done
 
