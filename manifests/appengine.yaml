@@ -45,6 +45,20 @@ spec:
               value: "true"
             - name: ODOO_WORKERS
               value: "2"
+            - name: LDAP_HOST
+              value: "polyon-dc"
+            - name: LDAP_PORT
+              value: "389"
+            - name: LDAP_BASE_DN
+              value: "{{.DomainDC}}"
+            - name: LDAP_USERS_DN
+              value: "CN=Users,{{.DomainDC}}"
+            - name: LDAP_GROUPS_DN
+              value: "{{.DomainDC}}"
+            - name: LDAP_BIND_DN
+              value: "Administrator@{{.Domain}}"
+            - name: LDAP_BIND_PASSWORD
+              value: "{{.AdminPassword}}"
           livenessProbe:
             httpGet:
               path: /web/health
