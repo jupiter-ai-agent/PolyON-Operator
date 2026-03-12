@@ -144,7 +144,7 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		RustFSSecretKey:       generatePassword(24),
 		LiteLLMMasterKey:      "sk-polyon-" + generatePassword(24),
 		GiteaAdminPassword:    cfg.AdminPassword, // same as DC admin
-		ERPEngineVersion:      "v0.5.3",
+		ERPEngineVersion:      "v0.5.4",
 	}
 }
 
