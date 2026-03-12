@@ -505,7 +505,7 @@ func runServicesSetup(cfg SetupConfig) {
 		mu.Unlock()
 
 		appendLog("info", "AI Gateway (LiteLLM) 설치 중...")
-		if err := deployManifest("litellm.yaml", "app=polyon-ai", tcfg, 180*time.Second); err != nil {
+		if err := deployManifest("litellm.yaml", "app=polyon-ai", tcfg, 300*time.Second); err != nil {
 			mu.Lock()
 			progress.Steps[stepIdx].Status = "error"
 			progress.Steps[stepIdx].Error = err.Error()
