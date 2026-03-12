@@ -106,3 +106,30 @@ spec:
                 name: polyon-portal
                 port:
                   number: 80
+---
+# ERPEngine Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: polyon-ingress-erpengine
+  namespace: {{.Namespace}}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - erp.{{.Domain}}
+      secretName: polyon-tls
+  rules:
+    - host: erp.{{.Domain}}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: polyon-erpengine
+                port:
+                  number: 8069
