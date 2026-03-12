@@ -197,7 +197,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"status": "started", "phase": cfg.Phase})
 	})
 
-	log.Printf("PolyON Operator v0.4.0 starting on :%s", port)
+	log.Printf("PolyON Operator v0.7.9 starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
