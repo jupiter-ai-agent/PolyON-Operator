@@ -121,63 +121,6 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon realm LDAP 동기화 완료")
 
-	// 9. Deploy Core backend (must be before Console — nginx needs polyon-core upstream)
-	appendLog("info", "Core 백엔드 배포 중...")
-	mu.Lock()
-	progress.Step = 5
-	progress.Message = "Core + Console 배포 중..."
-	progress.Steps[4].Status = "running"
-	progress.Steps[4].StartedAt = time.Now().UnixMilli()
-	mu.Unlock()
-
-	if err := deployManifest("core.yaml", "app=polyon-core", tcfg, 120*time.Second); err != nil {
-		return fmt.Errorf("deploy core: %w", err)
-	}
-	appendLog("success", "Core 백엔드 배포 완료")
-
-	// 10. Deploy Console (after Core — nginx upstream dependency)
-	appendLog("info", "Console 배포 중...")
-	if err := deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second); err != nil {
-		return fmt.Errorf("deploy console: %w", err)
-	}
-	appendLog("success", "Console 배포 완료")
-
-	// 10.5 Deploy Portal
-	appendLog("info", "Portal 배포 중...")
-	if err := deployManifest("portal.yaml", "app=polyon-portal", tcfg, 120*time.Second); err != nil {
-		return fmt.Errorf("deploy portal: %w", err)
-	}
-	appendLog("success", "Portal 배포 완료")
-
-	// 10.6 Deploy AppEngine (Foundation module)
-	// AppEngine DB + Secret 프로비저닝
-	appendLog("info", "AppEngine DB 생성 중...")
-	if err := provisionAppEngineDB(tcfg); err != nil {
-		appendLog("warn", "AppEngine DB 생성 실패 (비치명적): "+err.Error())
-	} else {
-		appendLog("success", "AppEngine DB 생성 완료")
-	}
-
-	appendLog("info", "AppEngine 배포 중...")
-	if err := deployManifest("appengine.yaml", "app=polyon-appengine", tcfg, 180*time.Second); err != nil {
-		return fmt.Errorf("deploy appengine: %w", err)
-	}
-	appendLog("success", "AppEngine 배포 완료")
-
-	// 11. Deploy Ingress
-	appendLog("info", "Ingress 배포 중...")
-	mu.Lock()
-	progress.Step = 6
-	progress.Message = "Ingress 설정 중..."
-	progress.Steps[5].Status = "running"
-	progress.Steps[5].StartedAt = time.Now().UnixMilli()
-	mu.Unlock()
-
-	if err := deployManifest("ingress.yaml", "", tcfg, 0); err != nil {
-		return fmt.Errorf("deploy ingress: %w", err)
-	}
-	appendLog("success", "Ingress 배포 완료")
-
 	appendLog("success", "Keycloak 프로비저닝 완료")
 	return nil
 }
