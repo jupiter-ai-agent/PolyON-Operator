@@ -453,7 +453,9 @@ function formatElapsed(ms) {
 }
 
 async function startInfra() {
-  document.getElementById('infra-start-btn').disabled = true;
+  const btn = document.getElementById('infra-start-btn');
+  btn.disabled = true;
+  btn.textContent = '설치 중...';
   document.getElementById('infra-status').textContent = '설치 시작 중...';
   document.getElementById('infra-log').classList.remove('hidden');
   phaseStartTime = Date.now();
@@ -467,7 +469,9 @@ async function startInfra() {
 
   if (!res.ok) {
     alert('설치 실패: ' + await res.text());
-    document.getElementById('infra-start-btn').disabled = false;
+    const failBtn = document.getElementById('infra-start-btn');
+    failBtn.disabled = false;
+    failBtn.textContent = '설치 시작';
     return;
   }
 
