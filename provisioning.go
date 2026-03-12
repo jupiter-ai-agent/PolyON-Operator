@@ -125,6 +125,14 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	appendLog("success", "Portal 배포 완료")
 
 	// 10.6 Deploy ERPEngine (Foundation module)
+	// ERPEngine DB + Secret 프로비저닝
+	appendLog("info", "ERPEngine DB 생성 중...")
+	if err := provisionERPEngineDB(tcfg); err != nil {
+		appendLog("warn", "ERPEngine DB 생성 실패 (비치명적): "+err.Error())
+	} else {
+		appendLog("success", "ERPEngine DB 생성 완료")
+	}
+
 	appendLog("info", "ERPEngine 배포 중...")
 	if err := deployManifest("erpengine.yaml", "app=polyon-erpengine", tcfg, 180*time.Second); err != nil {
 		return fmt.Errorf("deploy erpengine: %w", err)
@@ -492,4 +500,45 @@ func kubectlExec(namespace, labelSelector string, cmd []string) (string, error) 
 		return "", fmt.Errorf("%s", strings.TrimSpace(errMsg))
 	}
 	return strings.TrimSpace(stdout.String()), nil
+}
+
+// provisionERPEngineDB creates the polyon_erp database and K8s Secret for ERPEngine.
+func provisionERPEngineDB(tcfg TemplateConfig) error {
+	// 1. Create PostgreSQL database via kubectl exec
+	createDBSQL := "CREATE DATABASE polyon_erp OWNER polyon;"
+	_, err := kubectlExec(tcfg.Namespace, "app=polyon-db",
+		[]string{"psql", "-U", "polyon", "-c", createDBSQL})
+	if err != nil && !strings.Contains(err.Error(), "already exists") {
+		return fmt.Errorf("create db: %w", err)
+	}
+	appendLog("info", "  polyon_erp DB 생성 완료 (또는 이미 존재)")
+
+	// 2. Create K8s Secret: polyon-erpengine-secret
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	secretYAML := fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: polyon-erpengine-secret
+  namespace: %s
+type: Opaque
+stringData:
+  db_host: "polyon-db"
+  db_port: "5432"
+  db_name: "polyon_erp"
+  db_user: "polyon"
+  db_password: "%s"
+  admin_password: "%s"
+`, tcfg.Namespace, tcfg.DBPassword, tcfg.ConsoleAdminPassword)
+
+	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
+	applyCmd.Stdin = strings.NewReader(secretYAML)
+	var stderr bytes.Buffer
+	applyCmd.Stderr = &stderr
+	if err := applyCmd.Run(); err != nil {
+		return fmt.Errorf("create secret: %s", strings.TrimSpace(stderr.String()))
+	}
+	appendLog("info", "  polyon-erpengine-secret 생성 완료")
+	return nil
 }
