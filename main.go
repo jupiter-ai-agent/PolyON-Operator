@@ -496,7 +496,7 @@ func runServicesSetup(cfg SetupConfig) {
 		if err := provisionAppEngineDB(tcfg); err != nil {
 			appendLog("warn", "AppEngine DB 생성 실패 (비치명적): "+err.Error())
 		}
-		return deployManifest("appengine.yaml", "app=polyon-appengine", tcfg, 180*time.Second)
+		return deployManifest("appengine.yaml", "app=polyon-appengine", tcfg, 300*time.Second)
 	}); err != nil {
 		return
 	}
