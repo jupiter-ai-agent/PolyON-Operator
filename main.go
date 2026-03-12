@@ -31,6 +31,7 @@ var wizardHTML embed.FS
 
 // SubdomainConfig holds subdomain prefix overrides
 type SubdomainConfig struct {
+	AppEngine string `json:"appEngine"` // default: "apps"
 	Console string `json:"console"` // default: "console"
 	Auth    string `json:"auth"`    // default: "auth"
 	Mail    string `json:"mail"`    // default: "mail"

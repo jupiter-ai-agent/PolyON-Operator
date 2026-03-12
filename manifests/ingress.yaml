@@ -120,16 +120,16 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - erp.{{.Domain}}
+        - {{.AppEngineDomain}}
       secretName: polyon-tls
   rules:
-    - host: erp.{{.Domain}}
+    - host: {{.AppEngineDomain}}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: polyon-erpengine
+                name: polyon-appengine
                 port:
                   number: 8069

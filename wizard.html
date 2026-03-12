@@ -283,6 +283,13 @@
           <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
         </div>
       </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>AppEngine</label>
+        <div style="display:flex; align-items:center; gap:0;">
+          <input type="text" id="sub-appengine" value="apps" placeholder="apps" style="border-radius:4px 0 0 4px; border-right:none;">
+          <span class="subdomain-suffix" style="padding:0.75rem 1rem; background:#2a2a2a; border:1px solid var(--border); border-radius:0 4px 4px 0; font-size:0.875rem; color:var(--text-secondary); white-space:nowrap;">.</span>
+        </div>
+      </div>
     </div>
 
     <div class="btn-row">
@@ -419,7 +426,8 @@ function goToStep(step) {
         console: document.getElementById('sub-console').value.trim() || 'console',
         auth: document.getElementById('sub-auth').value.trim() || 'auth',
         mail: document.getElementById('sub-mail').value.trim() || 'mail',
-        portal: document.getElementById('sub-portal').value.trim() || 'portal'
+        portal: document.getElementById('sub-portal').value.trim() || 'portal',
+        appEngine: document.getElementById('sub-appengine').value.trim() || 'apps'
       }
     };
   }

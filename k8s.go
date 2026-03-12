@@ -37,6 +37,7 @@ type TemplateConfig struct {
 	AuthDomain            string // e.g. auth.cmars.com
 	MailDomain            string // e.g. mail.cmars.com
 	PortalDomain          string // e.g. portal.cmars.com
+	AppEngineDomain       string // e.g. apps.cmars.com
 	DomainDC              string // e.g. DC=cmars,DC=com
 	TLSCertBase64         string // base64-encoded TLS certificate
 	TLSKeyBase64          string // base64-encoded TLS private key
@@ -103,6 +104,10 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 	if portalSub == "" {
 		portalSub = "portal"
 	}
+	appEngineSub := cfg.Subdomains.AppEngine
+	if appEngineSub == "" {
+		appEngineSub = "apps"
+	}
 
 	domainLower := strings.ToLower(domain)
 
@@ -133,6 +138,7 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		AuthDomain:              authSub + "." + domainLower,
 		MailDomain:              mailSub + "." + domainLower,
 		PortalDomain:            portalSub + "." + domainLower,
+		AppEngineDomain:         appEngineSub + "." + domainLower,
 		DomainDC:                DomainToDC(domain),
 		TLSCertBase64:           tlsCertB64,
 		TLSKeyBase64:            tlsKeyB64,

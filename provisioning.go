@@ -61,7 +61,7 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 
 	// 6.5 Create confidential OIDC client "polyon-appengine" in polyon realm + get secret
 	appendLog("info", "polyon-appengine OIDC 클라이언트 생성 중...")
-	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", "apps."+tcfg.Domain)
+	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", tcfg.AppEngineDomain)
 	if err != nil {
 		return fmt.Errorf("create polyon-appengine client: %w", err)
 	}
