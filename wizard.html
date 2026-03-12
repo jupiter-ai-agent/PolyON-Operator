@@ -334,16 +334,7 @@
       <div class="progress-bar-fill" id="svc-bar" style="width:0%"></div>
     </div>
     <ul class="step-list" id="service-steps">
-      <li><div class="step-icon pending"></div><span class="step-name">Samba AD DC (Active Directory)</span><span class="step-time" data-step="0"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Keycloak (SSO / 인증)</span><span class="step-time" data-step="1"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Stalwart Mail (메일 서버)</span><span class="step-time" data-step="2"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">OPA (정책 엔진)</span><span class="step-time" data-step="3"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Gitea (Git 저장소)</span><span class="step-time" data-step="4"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">AI Gateway (LiteLLM)</span><span class="step-time" data-step="5"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Keycloak 프로비저닝 (Realm, Client, LDAP)</span><span class="step-time" data-step="6"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Console 배포</span><span class="step-time" data-step="7"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">AppEngine (ERP 엔진)</span><span class="step-time" data-step="8"></span></li>
-      <li><div class="step-icon pending"></div><span class="step-name">Ingress 설정</span><span class="step-time" data-step="9"></span></li>
+      <!-- 서버 API /api/state의 steps 배열에서 동적 생성 -->
     </ul>
     <div class="log-area hidden" id="svc-log"></div>
     <div class="status-msg" id="service-status">인프라 설치 완료 후 자동 진행...</div>
@@ -509,7 +500,7 @@ async function startServices() {
   });
 
   startLogPolling('svc-log');
-  pollPhase('services', 'service-steps', 'service-status', 10, 'svc-bar', 'svc-progress-text', 'svc-elapsed', () => {
+  pollPhase('services', 'service-steps', 'service-status', 12, 'svc-bar', 'svc-progress-text', 'svc-elapsed', () => {
     stopLogPolling();
     document.getElementById('final-domain').textContent = config.domain;
     document.getElementById('final-ns').textContent = config.namespace;
@@ -568,8 +559,17 @@ async function pollPhase(phase, listId, statusId, total, barId, progressTextId, 
   const res = await fetch('/api/state');
   const data = await res.json();
   const list = document.getElementById(listId);
+
+  // 서버 steps 배열로 동적 렌더링 (최초 1회 or 스텝 수 변경 시)
+  if (data.steps && list.querySelectorAll('li').length !== data.steps.length) {
+    list.innerHTML = data.steps.map((s, i) =>
+      `<li><div class="step-icon pending"></div><span class="step-name">${s.name}</span><span class="step-time" data-step="${i}"></span></li>`
+    ).join('');
+  }
+
   const items = list.querySelectorAll('li');
   const icons = list.querySelectorAll('li .step-icon');
+  const actualTotal = data.steps ? data.steps.length : total;
 
   let doneCount = 0;
   const now = Date.now();
@@ -605,7 +605,7 @@ async function pollPhase(phase, listId, statusId, total, barId, progressTextId, 
   }
 
   // Progress bar
-  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const pct = actualTotal > 0 ? Math.round((doneCount / actualTotal) * 100) : 0;
   document.getElementById(barId).style.width = pct + '%';
   const totalElapsed = formatElapsed(now - phaseStartTime);
   document.getElementById(progressTextId).textContent = doneCount + '/' + total + ' 완료';
