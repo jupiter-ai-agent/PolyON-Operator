@@ -318,7 +318,7 @@
   <div class="card step-card hidden" id="step-3">
     <div class="card-header"><span class="step-badge">Step 3</span>서비스 설치 + 프로비저닝</div>
     <div class="progress-summary" id="svc-summary">
-      <span id="svc-progress-text">0/9 완료</span>
+      <span id="svc-progress-text">0/10 완료</span>
       <span id="svc-elapsed"></span>
     </div>
     <div class="progress-bar-wrapper">
@@ -498,7 +498,7 @@ async function startServices() {
   });
 
   startLogPolling('svc-log');
-  pollPhase('services', 'service-steps', 'service-status', 9, 'svc-bar', 'svc-progress-text', 'svc-elapsed', () => {
+  pollPhase('services', 'service-steps', 'service-status', 10, 'svc-bar', 'svc-progress-text', 'svc-elapsed', () => {
     stopLogPolling();
     document.getElementById('final-domain').textContent = config.domain;
     document.getElementById('final-ns').textContent = config.namespace;
