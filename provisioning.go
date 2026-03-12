@@ -61,12 +61,21 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 
 	// 6.5 Create confidential OIDC client "polyon-appengine" in polyon realm + get secret
 	appendLog("info", "polyon-appengine OIDC 클라이언트 생성 중...")
-	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", "erp."+tcfg.Domain)
+	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-appengine", "apps."+tcfg.Domain)
 	if err != nil {
 		return fmt.Errorf("create polyon-appengine client: %w", err)
 	}
 	tcfg.AppEngineClientSecret = erpClientSecret
 	appendLog("success", "polyon-appengine 클라이언트 생성 완료 (polyon realm)")
+
+	// 6.6 Create confidential OIDC client "polyon-appengine-admin" in admin realm (Console backoffice)
+	appendLog("info", "polyon-appengine-admin OIDC 클라이언트 생성 중...")
+	appEngineAdminSecret, err := createConfidentialOIDCClient(keycloakURL, token, "admin", "polyon-appengine-admin", tcfg.ConsoleDomain)
+	if err != nil {
+		return fmt.Errorf("create polyon-appengine-admin client: %w", err)
+	}
+	tcfg.AppEngineAdminClientSecret = appEngineAdminSecret
+	appendLog("success", "polyon-appengine-admin 클라이언트 생성 완료 (admin realm)")
 
 	// 7. Create local admin user in admin realm (no LDAP)
 	appendLog("info", "admin realm 관리자 계정 생성 중...")
@@ -82,6 +91,20 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 		return fmt.Errorf("create LDAP federation in polyon: %w", err)
 	}
 	appendLog("success", fmt.Sprintf("polyon realm LDAP 페더레이션 완료 (id=%s)", fedID))
+
+	// 8.3 Add LDAP Group Mapper — memberOf → KC groups
+	appendLog("info", "LDAP Group Mapper 추가 중...")
+	if err := addLDAPGroupMapper(keycloakURL, token, "polyon", fedID, tcfg); err != nil {
+		return fmt.Errorf("add LDAP group mapper: %w", err)
+	}
+	appendLog("success", "LDAP Group Mapper 추가 완료")
+
+	// 8.4 Add groups claim mapper to polyon-appengine client → groups in JWT
+	appendLog("info", "polyon-appengine groups claim mapper 추가 중...")
+	if err := addGroupsClaimMapper(keycloakURL, token, "polyon", "polyon-appengine"); err != nil {
+		return fmt.Errorf("add groups claim mapper: %w", err)
+	}
+	appendLog("success", "polyon-appengine groups claim mapper 추가 완료")
 
 	// 8.5. Ensure all AD users have mail attribute (required for Stalwart mail)
 	appendLog("info", "AD 사용자 메일 속성 자동 설정 중...")
@@ -538,9 +561,13 @@ stringData:
   OIDC_AUTH_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/auth"
   OIDC_TOKEN_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/token"
   OIDC_JWKS_URI: "https://auth.%s/realms/polyon/protocol/openid-connect/certs"
+  ADMIN_OIDC_ISSUER: "https://auth.%s/realms/admin"
+  ADMIN_OIDC_CLIENT_ID: "polyon-appengine-admin"
+  ADMIN_OIDC_CLIENT_SECRET: "%s"
 `, tcfg.Namespace, tcfg.DBPassword, tcfg.ConsoleAdminPassword,
 		tcfg.Domain, tcfg.AppEngineClientSecret,
-		tcfg.Domain, tcfg.Domain, tcfg.Domain)
+		tcfg.Domain, tcfg.Domain, tcfg.Domain,
+		tcfg.Domain, tcfg.AppEngineAdminClientSecret)
 
 	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
 	applyCmd.Stdin = strings.NewReader(secretYAML)
@@ -550,6 +577,103 @@ stringData:
 		return fmt.Errorf("create secret: %s", strings.TrimSpace(stderr.String()))
 	}
 	appendLog("info", "  polyon-appengine-secret 생성 완료")
+	return nil
+}
+
+// addLDAPGroupMapper adds a group-ldap-mapper to the LDAP federation.
+// This maps AD memberOf → Keycloak groups, which are then added to the JWT groups claim.
+func addLDAPGroupMapper(baseURL, token, realm, fedID string, tcfg TemplateConfig) error {
+	payload := map[string]interface{}{
+		"name":         "ldap-group-membership",
+		"providerId":   "group-ldap-mapper",
+		"providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+		"parentId":     fedID,
+		"config": map[string][]string{
+			"mode":                                 {"READ_ONLY"},
+			"membership.attribute.type":            {"DN"},
+			"member.of.attribute":                  {"memberOf"},
+			"groups.dn":                            {tcfg.DomainDC},
+			"group.name.ldap.attribute":            {"cn"},
+			"group.object.classes":                 {"group"},
+			"preserve.group.inheritance":           {"false"},
+			"ignore.missing.groups":                {"false"},
+			"user.roles.retrieve.strategy":         {"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE_RECURSIVELY"},
+			"mapped.group.attributes":              {""},
+			"drop.non.existing.groups.during.sync": {"false"},
+			"groups.path":                          {"/"},
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", baseURL+"/admin/realms/"+realm+"/components", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 && resp.StatusCode != 409 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("add group mapper failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+// addGroupsClaimMapper adds an OIDC groups claim protocol mapper to a KC client.
+// This puts the groups list into the JWT access_token as "groups" claim.
+func addGroupsClaimMapper(baseURL, token, realm, clientID string) error {
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+
+	// Find client UUID by clientId
+	searchReq, _ := http.NewRequest("GET", baseURL+"/admin/realms/"+realm+"/clients?clientId="+clientID, nil)
+	searchReq.Header.Set("Authorization", "Bearer "+token)
+	searchResp, err := httpClient.Do(searchReq)
+	if err != nil {
+		return fmt.Errorf("search client: %w", err)
+	}
+	defer searchResp.Body.Close()
+
+	var clients []map[string]interface{}
+	if err := json.NewDecoder(searchResp.Body).Decode(&clients); err != nil || len(clients) == 0 {
+		return fmt.Errorf("client %s not found", clientID)
+	}
+	clientUUID, _ := clients[0]["id"].(string)
+
+	payload := map[string]interface{}{
+		"name":            "groups-claim",
+		"protocol":        "openid-connect",
+		"protocolMapper":  "oidc-group-membership-mapper",
+		"consentRequired": false,
+		"config": map[string]string{
+			"full.path":            "false",
+			"id.token.claim":       "true",
+			"access.token.claim":   "true",
+			"claim.name":           "groups",
+			"userinfo.token.claim": "true",
+		},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST",
+		baseURL+"/admin/realms/"+realm+"/clients/"+clientUUID+"/protocol-mappers/models",
+		bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 && resp.StatusCode != 409 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("add groups claim mapper failed (%d): %s", resp.StatusCode, string(respBody))
+	}
 	return nil
 }
 

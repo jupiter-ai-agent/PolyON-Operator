@@ -19,6 +19,11 @@ VERSION_FILE="$REPO_ROOT/VERSION"
 REGISTRY="jupitertriangles"
 PLATFORM="linux/arm64"
 
+# 개별 리포 경로 (PolyON-Operator와 동일 레벨)
+CORE_ROOT="${REPO_ROOT}/../PolyON-Core"
+CONSOLE_ROOT="${REPO_ROOT}/../PolyON-Console"
+PORTAL_ROOT="${REPO_ROOT}/../PolyON-Portal"
+
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log()  { echo "${GREEN}[release]${NC} $*"; }
@@ -39,7 +44,7 @@ load_versions() {
 
 save_versions() {
   : > "$VERSION_FILE"
-  for key in core console operator dc mail erpengine; do
+  for key in core console portal operator dc mail appengine; do
     [[ -n "${VER[$key]:-}" ]] && echo "$key=${VER[$key]}" >> "$VERSION_FILE"
   done
 }
@@ -58,7 +63,7 @@ bump_patch() {
 build_core() {
   local tag="$REGISTRY/polyon-core:v${VER[core]}"
   step "Core v${VER[core]}"
-  cd "$REPO_ROOT/core"
+  cd "$CORE_ROOT"
   log "Go build..."
   go build ./...
   log "Docker build: $tag"
@@ -71,7 +76,7 @@ build_core() {
 build_console() {
   local tag="$REGISTRY/polyon-console:v${VER[console]}"
   step "Console v${VER[console]}"
-  cd "$REPO_ROOT/console"
+  cd "$CONSOLE_ROOT"
   # Sync package.json version
   sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"${VER[console]}\"/" package.json
   log "npm build..."
@@ -84,13 +89,26 @@ build_console() {
   log "Console ✓"
 }
 
+build_portal() {
+  local tag="$REGISTRY/polyon-portal:v${VER[portal]:-0.2.0}"
+  step "Portal v${VER[portal]:-0.2.0}"
+  cd "$PORTAL_ROOT"
+  log "Docker build: $tag"
+  docker build --platform "$PLATFORM" -t "$tag" .
+  log "Docker push..."
+  docker push "$tag"
+  log "Portal ✓"
+}
+
 build_operator() {
   local tag="$REGISTRY/polyon-operator:v${VER[operator]}"
   step "Operator v${VER[operator]}"
-  cd "$REPO_ROOT/operator"
+  cd "$REPO_ROOT"
   log "Docker build: $tag"
   docker build --platform "$PLATFORM" -t "$tag" .
-  log "Operator ✓ (local only — K8s에서 직접 사용)"
+  log "Docker push..."
+  docker push "$tag"
+  log "Operator ✓"
 }
 
 build_dc() {
@@ -115,7 +133,7 @@ build_mail() {
 
 sync_manifests() {
   step "Operator manifest 이미지 태그 동기화"
-  local m="$REPO_ROOT/operator/manifests"
+  local m="$REPO_ROOT/manifests"
 
   sed -i '' "s|$REGISTRY/polyon-core:v[0-9.]*|$REGISTRY/polyon-core:v${VER[core]}|g" "$m/core.yaml"
   log "core.yaml → v${VER[core]}"
@@ -129,8 +147,8 @@ sync_manifests() {
   sed -i '' "s|$REGISTRY/polyon-mail:v[0-9.]*|$REGISTRY/polyon-mail:v${VER[mail]}|g" "$m/stalwart.yaml"
   log "stalwart.yaml → v${VER[mail]}"
 
-  sed -i '' "s|$REGISTRY/polyon-erpengine:v[0-9.]*|$REGISTRY/polyon-erpengine:v${VER[erpengine]}|g" "$m/erpengine.yaml"
-  log "erpengine.yaml → v${VER[erpengine]}"
+  sed -i '' "s|$REGISTRY/polyon-appengine:v[0-9.]*|$REGISTRY/polyon-appengine:v${VER[appengine]}|g" "$m/appengine.yaml"
+  log "appengine.yaml → v${VER[appengine]}"
 
   log "동기화 완료 ✓"
 }
@@ -162,7 +180,7 @@ show_status() {
   done
 
   step "Operator manifest images"
-  grep "image:.*$REGISTRY" "$REPO_ROOT/operator/manifests/"*.yaml | sed 's|.*/manifests/|  |'
+  grep "image:.*$REGISTRY" "$REPO_ROOT/manifests/"*.yaml | sed 's|.*/manifests/|  |'
 
   step "K8s deployed (polyon)"
   kubectl get deploy,statefulset -n polyon \
@@ -171,12 +189,12 @@ show_status() {
 
   step "Sync check"
   local ok=true
-  for yaml_file in "$REPO_ROOT/operator/manifests/"*.yaml; do
+  for yaml_file in "$REPO_ROOT/manifests/"*.yaml; do
     local fname="${yaml_file:t}"
-    for k in core console dc mail erpengine; do
+    for k in core console portal dc mail appengine; do
       if grep -q "$REGISTRY/polyon-$k:" "$yaml_file" 2>/dev/null; then
         local in_yaml=$(grep -o "$REGISTRY/polyon-$k:v[0-9.]*" "$yaml_file" | head -1)
-        local expected="$REGISTRY/polyon-$k:v${VER[$k]}"
+        local expected="$REGISTRY/polyon-$k:v${VER[$k]:-?}"
         if [[ "$in_yaml" != "$expected" ]]; then
           warn "MISMATCH: $fname has $in_yaml, expected $expected"
           ok=false
@@ -200,8 +218,8 @@ main() {
     case "$arg" in
       --bump)           do_bump=true ;;
       --status|--dry-run) do_status=true ;;
-      core|console|operator|dc|mail) targets+=("$arg") ;;
-      all) targets=(core console operator) ;;
+      core|console|portal|operator|dc|mail|appengine) targets+=("$arg") ;;
+      all) targets=(core console portal operator) ;;
       *) err "Unknown: $arg"; exit 1 ;;
     esac
   done
@@ -231,10 +249,12 @@ main() {
   # Build targets
   for t in "${targets[@]}"; do
     case "$t" in
-      core)     build_core ;;
-      console)  build_console ;;
-      dc)       build_dc ;;
-      mail)     build_mail ;;
+      core)      build_core ;;
+      console)   build_console ;;
+      portal)    build_portal ;;
+      dc)        build_dc ;;
+      mail)      build_mail ;;
+      appengine) warn "AppEngine은 PolyON-AppEngine 리포에서 별도 빌드" ;;
     esac
   done
 

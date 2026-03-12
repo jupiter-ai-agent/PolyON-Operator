@@ -49,8 +49,9 @@ type TemplateConfig struct {
 	RustFSSecretKey       string // RustFS secret key
 	LiteLLMMasterKey      string // LiteLLM AI Gateway master key
 	GiteaAdminPassword    string // Gitea admin password
-	AppEngineVersion      string // AppEngine image version (e.g. "v0.5.3")
-	AppEngineClientSecret string // Keycloak polyon-appengine client secret (set during provisioning)
+	AppEngineVersion           string // AppEngine image version (e.g. "v0.5.3")
+	AppEngineClientSecret      string // Keycloak polyon-appengine client secret (set during provisioning)
+	AppEngineAdminClientSecret string // Keycloak polyon-appengine-admin client secret (admin realm)
 }
 
 // generatePassword creates a random alphanumeric password of given length
