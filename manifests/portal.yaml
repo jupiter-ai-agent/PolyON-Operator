@@ -39,7 +39,7 @@ spec:
       containers:
         - name: portal
           image: jupitertriangles/polyon-portal:{{ .PortalVersion }}
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           readinessProbe:

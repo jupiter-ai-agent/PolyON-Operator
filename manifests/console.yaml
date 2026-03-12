@@ -186,7 +186,7 @@ spec:
       containers:
         - name: console
           image: jupitertriangles/polyon-console:{{ .ConsoleVersion }}
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
           readinessProbe:
