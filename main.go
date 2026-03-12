@@ -308,25 +308,84 @@ func runInfraSetup(cfg SetupConfig) {
 	appendLog("success", "인프라 설치 완료")
 }
 
-func runServicesSetup(cfg SetupConfig) {
-	steps := []StepStatus{
-		{Name: "Samba AD DC (Active Directory)", Status: "pending"},
-		{Name: "Keycloak (SSO / 인증)", Status: "pending"},
-		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},
-		{Name: "OPA (정책 엔진)", Status: "pending"},
-		{Name: "Gitea (Git 저장소)", Status: "pending"},
-		{Name: "AI Gateway (LiteLLM)", Status: "pending"},
-		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"},
-		{Name: "Console 배포", Status: "pending"},
-		{Name: "AppEngine (ERP 엔진)", Status: "pending"},
-		{Name: "Ingress 설정", Status: "pending"},
+// runStep은 단일 설치 스텝을 실행하고 progress를 업데이트하는 헬퍼입니다.
+// fatal=true이면 실패 시 에러를 반환하고, false이면 경고만 남기고 계속 진행합니다.
+func runStep(stepIdx int, name string, fatal bool, fn func() error) error {
+	now := time.Now().UnixMilli()
+	mu.Lock()
+	progress.Step = stepIdx + 1
+	progress.Message = name + " 진행 중..."
+	progress.Steps[stepIdx].Status = "running"
+	progress.Steps[stepIdx].StartedAt = now
+	mu.Unlock()
+
+	appendLog("info", name+" 진행 중...")
+	err := fn()
+	doneAt := time.Now().UnixMilli()
+	elapsed := (doneAt - now) / 1000
+
+	if err != nil {
+		if fatal {
+			mu.Lock()
+			progress.Steps[stepIdx].Status = "error"
+			progress.Steps[stepIdx].Error = err.Error()
+			progress.State = "error"
+			progress.Message = name + " 실패: " + err.Error()
+			mu.Unlock()
+			appendLog("error", fmt.Sprintf("%s 실패: %v", name, err))
+		} else {
+			mu.Lock()
+			progress.Steps[stepIdx].Status = "done"
+			progress.Steps[stepIdx].DoneAt = doneAt
+			mu.Unlock()
+			appendLog("warn", fmt.Sprintf("%s 경고 (비치명적): %v", name, err))
+		}
+		return err
 	}
 
-	deploys := []serviceStep{
-		{manifest: "samba-dc.yaml", labelSelector: "app=polyon-dc", timeout: 300 * time.Second},
-		{manifest: "keycloak.yaml", labelSelector: "app=polyon-auth", timeout: 300 * time.Second},
-		{manifest: "stalwart-config.yaml", labelSelector: "", timeout: 0},
-		{manifest: "stalwart.yaml", labelSelector: "app=polyon-mail", timeout: 120 * time.Second},
+	mu.Lock()
+	progress.Steps[stepIdx].Status = "done"
+	progress.Steps[stepIdx].DoneAt = doneAt
+	mu.Unlock()
+	appendLog("success", fmt.Sprintf("%s 완료 (%ds)", name, elapsed))
+	return nil
+}
+
+// ensureDB creates a PostgreSQL database if it doesn't exist.
+func ensureDB(ns, dbName string) {
+	out, _ := kubectlExec(ns, "app=polyon-db",
+		[]string{"psql", "-U", "polyon", "-d", "postgres", "-tAc",
+			fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s'", dbName)})
+	if strings.TrimSpace(out) == "1" {
+		appendLog("info", fmt.Sprintf("DB %s 이미 존재", dbName))
+		return
+	}
+	kubectlExec(ns, "app=polyon-db",
+		[]string{"psql", "-U", "polyon", "-d", "postgres", "-c",
+			fmt.Sprintf("CREATE DATABASE %s OWNER polyon", dbName)})
+	appendLog("success", fmt.Sprintf("DB %s 생성 완료", dbName))
+}
+
+func runServicesSetup(cfg SetupConfig) {
+	// 설치 순서 (의존성 기반):
+	// [코어]       DC → KC → Mail
+	// [KC 프로비저닝] Realm/Client/LDAP/GroupMapper  ← KC 확정 직후
+	// [앱 서비스]   OPA → Gitea → AI Gateway         ← KC 프로비저닝 후 (향후 OIDC 연동 대비)
+	// [플랫폼 UI]   Core → Console → Portal → AppEngine
+	// [라우팅]      Ingress
+	steps := []StepStatus{
+		{Name: "Samba AD DC (Active Directory)", Status: "pending"},       // 0
+		{Name: "Keycloak (SSO / 인증)", Status: "pending"},                // 1
+		{Name: "Stalwart Mail (메일 서버)", Status: "pending"},             // 2
+		{Name: "Keycloak 프로비저닝 (Realm, Client, LDAP)", Status: "pending"}, // 3
+		{Name: "OPA (정책 엔진)", Status: "pending"},                       // 4
+		{Name: "Gitea (Git 저장소)", Status: "pending"},                    // 5
+		{Name: "AI Gateway (LiteLLM)", Status: "pending"},                 // 6
+		{Name: "Core 백엔드", Status: "pending"},                           // 7
+		{Name: "Console", Status: "pending"},                               // 8
+		{Name: "Portal", Status: "pending"},                                // 9
+		{Name: "AppEngine (ERP 엔진)", Status: "pending"},                  // 10
+		{Name: "Ingress 설정", Status: "pending"},                          // 11
 	}
 
 	mu.Lock()
@@ -337,147 +396,54 @@ func runServicesSetup(cfg SetupConfig) {
 	mu.Unlock()
 
 	tcfg := getOrCreateTemplateConfig(cfg)
-
 	appendLog("info", fmt.Sprintf("서비스 설치 시작: domain=%s", cfg.Domain))
 
-	// Deploy core services (samba, keycloak, stalwart-config + stalwart)
-	serviceNames := []string{
-		"Samba AD DC (Active Directory)",
-		"Keycloak (SSO / 인증)",
-		"Stalwart Mail (메일 서버)",
-	}
-	for i, deploy := range deploys {
-		stepIdx := i
-		if i == 2 {
-			appendLog("info", "Stalwart 설정(ConfigMap) 배포 중...")
-			if err := deployManifest(deploy.manifest, deploy.labelSelector, tcfg, deploy.timeout); err != nil {
-				mu.Lock()
-				progress.Steps[2].Status = "error"
-				progress.Steps[2].Error = err.Error()
-				progress.State = "error"
-				progress.Message = "Stalwart 설정 실패: " + err.Error()
-				mu.Unlock()
-				appendLog("error", "Stalwart 설정 실패: "+err.Error())
-				return
-			}
-			continue
-		}
-		if i == 3 {
-			stepIdx = 2
-		}
-
-		now := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Step = stepIdx + 1
-		progress.Message = serviceNames[stepIdx] + " 설치 중..."
-		progress.Steps[stepIdx].Status = "running"
-		progress.Steps[stepIdx].StartedAt = now
-		mu.Unlock()
-
-		appendLog("info", fmt.Sprintf("[%d/3] %s 설치 중...", stepIdx+1, serviceNames[stepIdx]))
-
-		if err := deployManifest(deploy.manifest, deploy.labelSelector, tcfg, deploy.timeout); err != nil {
-			mu.Lock()
-			progress.Steps[stepIdx].Status = "error"
-			progress.Steps[stepIdx].Error = err.Error()
-			progress.State = "error"
-			progress.Message = serviceNames[stepIdx] + " 설치 실패: " + err.Error()
-			mu.Unlock()
-			appendLog("error", serviceNames[stepIdx]+" 설치 실패: "+err.Error())
-			return
-		}
-
-		doneAt := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Steps[stepIdx].Status = "done"
-		progress.Steps[stepIdx].DoneAt = doneAt
-		mu.Unlock()
-		elapsed := (doneAt - now) / 1000
-		appendLog("success", fmt.Sprintf("%s 설치 완료 (%ds)", serviceNames[stepIdx], elapsed))
+	// ── 0: Samba AD DC ──────────────────────────────────────────
+	if err := runStep(0, "Samba AD DC (Active Directory)", true, func() error {
+		return deployManifest("samba-dc.yaml", "app=polyon-dc", tcfg, 300*time.Second)
+	}); err != nil {
+		return
 	}
 
-	// Deploy OPA (Foundation #5)
-	{
-		stepIdx := 3
-		now := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Step = stepIdx + 1
-		progress.Message = "OPA (정책 엔진) 설치 중..."
-		progress.Steps[stepIdx].Status = "running"
-		progress.Steps[stepIdx].StartedAt = now
-		mu.Unlock()
-
-		appendLog("info", "OPA (정책 엔진) 설치 중...")
-		if err := deployManifest("opa.yaml", "app=polyon-opa", tcfg, 60*time.Second); err != nil {
-			mu.Lock()
-			progress.Steps[stepIdx].Status = "error"
-			progress.Steps[stepIdx].Error = err.Error()
-			progress.State = "error"
-			progress.Message = "OPA 설치 실패: " + err.Error()
-			mu.Unlock()
-			appendLog("error", "OPA 설치 실패: "+err.Error())
-			return
-		}
-		doneAt := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Steps[stepIdx].Status = "done"
-		progress.Steps[stepIdx].DoneAt = doneAt
-		mu.Unlock()
-		appendLog("success", fmt.Sprintf("OPA 설치 완료 (%ds)", (doneAt-now)/1000))
+	// ── 1: Keycloak ─────────────────────────────────────────────
+	if err := runStep(1, "Keycloak (SSO / 인증)", true, func() error {
+		return deployManifest("keycloak.yaml", "app=polyon-auth", tcfg, 300*time.Second)
+	}); err != nil {
+		return
 	}
 
-	// Create Gitea + LiteLLM databases
-	appendLog("info", "Gitea/AI Gateway 데이터베이스 생성 중...")
-	for _, dbName := range []string{"polyon_gitea", "polyon_ai"} {
-		if _, err := kubectlExec(tcfg.Namespace, "app=polyon-db",
-			[]string{"psql", "-U", "polyon", "-d", "postgres", "-c",
-				fmt.Sprintf("SELECT 'exists' FROM pg_database WHERE datname='%s'", dbName)}); err == nil {
-			// Check if DB exists
-			out, _ := kubectlExec(tcfg.Namespace, "app=polyon-db",
-				[]string{"psql", "-U", "polyon", "-d", "postgres", "-tAc",
-					fmt.Sprintf("SELECT 1 FROM pg_database WHERE datname='%s'", dbName)})
-			if strings.TrimSpace(out) != "1" {
-				kubectlExec(tcfg.Namespace, "app=polyon-db",
-					[]string{"psql", "-U", "polyon", "-d", "postgres", "-c",
-						fmt.Sprintf("CREATE DATABASE %s OWNER polyon", dbName)})
-				appendLog("success", fmt.Sprintf("데이터베이스 %s 생성 완료", dbName))
-			} else {
-				appendLog("info", fmt.Sprintf("데이터베이스 %s 이미 존재", dbName))
-			}
+	// ── 2: Stalwart Mail ────────────────────────────────────────
+	if err := runStep(2, "Stalwart Mail (메일 서버)", true, func() error {
+		if err := deployManifest("stalwart-config.yaml", "", tcfg, 0); err != nil {
+			return fmt.Errorf("Stalwart ConfigMap: %w", err)
 		}
+		return deployManifest("stalwart.yaml", "app=polyon-mail", tcfg, 120*time.Second)
+	}); err != nil {
+		return
 	}
 
-	// Deploy Gitea (Foundation #7)
-	{
-		stepIdx := 4
-		now := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Step = stepIdx + 1
-		progress.Message = "Gitea (Git 저장소) 설치 중..."
-		progress.Steps[stepIdx].Status = "running"
-		progress.Steps[stepIdx].StartedAt = now
-		mu.Unlock()
+	// ── 3: Keycloak 프로비저닝 ───────────────────────────────────
+	// KC가 완전히 기동된 직후 프로비저닝 (이후 앱들이 KC OIDC를 사용할 수 있도록)
+	if err := runStep(3, "Keycloak 프로비저닝 (Realm, Client, LDAP)", true, func() error {
+		return runProvisioning(cfg, tcfg)
+	}); err != nil {
+		return
+	}
 
-		appendLog("info", "Gitea (Git 저장소) 설치 중...")
+	// ── 4: OPA ──────────────────────────────────────────────────
+	if err := runStep(4, "OPA (정책 엔진)", true, func() error {
+		return deployManifest("opa.yaml", "app=polyon-opa", tcfg, 60*time.Second)
+	}); err != nil {
+		return
+	}
+
+	// ── 5: Gitea ────────────────────────────────────────────────
+	if err := runStep(5, "Gitea (Git 저장소)", true, func() error {
+		ensureDB(tcfg.Namespace, "polyon_gitea")
 		if err := deployManifest("gitea.yaml", "app=polyon-gitea", tcfg, 120*time.Second); err != nil {
-			mu.Lock()
-			progress.Steps[stepIdx].Status = "error"
-			progress.Steps[stepIdx].Error = err.Error()
-			progress.State = "error"
-			progress.Message = "Gitea 설치 실패: " + err.Error()
-			mu.Unlock()
-			appendLog("error", "Gitea 설치 실패: "+err.Error())
-			return
+			return err
 		}
-		doneAt := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Steps[stepIdx].Status = "done"
-		progress.Steps[stepIdx].DoneAt = doneAt
-		mu.Unlock()
-		appendLog("success", fmt.Sprintf("Gitea 설치 완료 (%ds)", (doneAt-now)/1000))
-
-		// Create Gitea admin user
-		appendLog("info", "Gitea 관리자 계정 생성 중...")
+		// Gitea 관리자 계정 생성 (비치명적)
 		_, err := kubectlExec(tcfg.Namespace, "app=polyon-gitea",
 			[]string{"su", "git", "-c",
 				fmt.Sprintf("gitea admin user create --admin --username polyon-admin --password '%s' --email admin@%s --config /data/gitea/conf/app.ini",
@@ -491,79 +457,57 @@ func runServicesSetup(cfg SetupConfig) {
 		} else {
 			appendLog("success", "Gitea 관리자 계정 생성 완료 (polyon-admin)")
 		}
-	}
-
-	// Deploy LiteLLM (Foundation #8 — AI Gateway)
-	{
-		stepIdx := 5
-		now := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Step = stepIdx + 1
-		progress.Message = "AI Gateway (LiteLLM) 설치 중..."
-		progress.Steps[stepIdx].Status = "running"
-		progress.Steps[stepIdx].StartedAt = now
-		mu.Unlock()
-
-		appendLog("info", "AI Gateway (LiteLLM) 설치 중...")
-		if err := deployManifest("litellm.yaml", "app=polyon-ai", tcfg, 300*time.Second); err != nil {
-			mu.Lock()
-			progress.Steps[stepIdx].Status = "error"
-			progress.Steps[stepIdx].Error = err.Error()
-			progress.State = "error"
-			progress.Message = "AI Gateway 설치 실패: " + err.Error()
-			mu.Unlock()
-			appendLog("error", "AI Gateway 설치 실패: "+err.Error())
-			return
-		}
-		doneAt := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Steps[stepIdx].Status = "done"
-		progress.Steps[stepIdx].DoneAt = doneAt
-		mu.Unlock()
-		appendLog("success", fmt.Sprintf("AI Gateway 설치 완료 (%ds)", (doneAt-now)/1000))
-	}
-
-	// Provisioning phase (must run before Console — realm must exist for OIDC discovery)
-	provNow := time.Now().UnixMilli()
-	mu.Lock()
-	progress.Step = 7
-	progress.Message = "Keycloak 프로비저닝 (Realm, Client, LDAP) 진행 중..."
-	progress.Steps[6].Status = "running"
-	progress.Steps[6].StartedAt = provNow
-	mu.Unlock()
-
-	appendLog("info", "Keycloak 프로비저닝 시작...")
-	if err := runProvisioning(cfg, tcfg); err != nil {
-		mu.Lock()
-		progress.Steps[3].Status = "error"
-		progress.Steps[3].Error = err.Error()
-		progress.State = "error"
-		progress.Message = "프로비저닝 실패: " + err.Error()
-		mu.Unlock()
-		appendLog("error", "프로비저닝 실패: "+err.Error())
+		return nil
+	}); err != nil {
 		return
 	}
 
-	provDone := time.Now().UnixMilli()
-	provElapsed := (provDone - provNow) / 1000
-	mu.Lock()
-	progress.Steps[6].Status = "done"
-	progress.Steps[6].DoneAt = provDone
-	mu.Unlock()
-	appendLog("success", fmt.Sprintf("프로비저닝 완료 (%ds)", provElapsed))
-
-	// Mark remaining steps done (Console & Ingress are deployed via runProvisioning)
-	{
-		doneAt := time.Now().UnixMilli()
-		mu.Lock()
-		progress.Steps[7].Status = "done"
-		progress.Steps[7].DoneAt = doneAt
-		progress.Steps[8].Status = "done"
-		progress.Steps[8].DoneAt = doneAt
-		progress.State = "phase_done"
-		progress.Message = "서비스 설치 완료"
-		mu.Unlock()
+	// ── 6: AI Gateway (LiteLLM) ─────────────────────────────────
+	if err := runStep(6, "AI Gateway (LiteLLM)", true, func() error {
+		ensureDB(tcfg.Namespace, "polyon_ai")
+		return deployManifest("litellm.yaml", "app=polyon-ai", tcfg, 300*time.Second)
+	}); err != nil {
+		return
 	}
 
+	// ── 7: Core 백엔드 ──────────────────────────────────────────
+	if err := runStep(7, "Core 백엔드", true, func() error {
+		return deployManifest("core.yaml", "app=polyon-core", tcfg, 120*time.Second)
+	}); err != nil {
+		return
+	}
+
+	// ── 8: Console ──────────────────────────────────────────────
+	if err := runStep(8, "Console", true, func() error {
+		return deployManifest("console.yaml", "app=polyon-console", tcfg, 120*time.Second)
+	}); err != nil {
+		return
+	}
+
+	// ── 9: Portal ───────────────────────────────────────────────
+	if err := runStep(9, "Portal", true, func() error {
+		return deployManifest("portal.yaml", "app=polyon-portal", tcfg, 120*time.Second)
+	}); err != nil {
+		return
+	}
+
+	// ── 10: AppEngine ───────────────────────────────────────────
+	if err := runStep(10, "AppEngine (ERP 엔진)", true, func() error {
+		return deployManifest("appengine.yaml", "app=polyon-appengine", tcfg, 180*time.Second)
+	}); err != nil {
+		return
+	}
+
+	// ── 11: Ingress ─────────────────────────────────────────────
+	if err := runStep(11, "Ingress 설정", true, func() error {
+		return deployManifest("ingress.yaml", "", tcfg, 0)
+	}); err != nil {
+		return
+	}
+
+	mu.Lock()
+	progress.State = "phase_done"
+	progress.Message = "서비스 설치 완료"
+	mu.Unlock()
 	appendLog("success", "서비스 설치 완료 — 모든 구성 요소가 배포되었습니다")
 }
