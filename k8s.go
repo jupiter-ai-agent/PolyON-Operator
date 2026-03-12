@@ -237,12 +237,12 @@ func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
 		RustFSSecretKey:       generatePassword(24),
 		LiteLLMMasterKey:      "sk-polyon-" + generatePassword(24),
 		GiteaAdminPassword:    cfg.AdminPassword, // same as DC admin
-		AppEngineVersion:      "v" + versions["appengine"],
-		DCVersion:             "v" + versions["dc"],
-		MailVersion:           "v" + versions["mail"],
-		CoreVersion:           "v" + versions["core"],
-		ConsoleVersion:        "v" + versions["console"],
-		PortalVersion:         "v" + versions["portal"],
+		AppEngineVersion:      versions["appengine"],
+		DCVersion:             versions["dc"],
+		MailVersion:           versions["mail"],
+		CoreVersion:           versions["core"],
+		ConsoleVersion:        versions["console"],
+		PortalVersion:         versions["portal"],
 	}
 }
 
