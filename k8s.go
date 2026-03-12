@@ -9,12 +9,17 @@ import (
 	"crypto/x509/pkix"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -72,8 +77,7 @@ func generatePassword(length int) string {
 }
 
 // DomainToDC converts a domain like "cmars.com" to "DC=cmars,DC=com"
-// readVersionFile reads VERSION file embedded in the binary and returns a key→value map.
-// Falls back to defaults if not available.
+// readVersions reads VERSION file and returns a key→value map (fallback defaults).
 func readVersions() map[string]string {
 	defaults := map[string]string{
 		"core": "1.14.2", "console": "1.10.16", "portal": "0.2.0",
@@ -93,6 +97,61 @@ func readVersions() map[string]string {
 	return defaults
 }
 
+// fetchLatestTag queries Docker Hub for the latest vX.Y.Z tag of a jupitertriangles image.
+// Falls back to fallbackVersion if unavailable or no network.
+func fetchLatestTag(image, fallbackVersion string) string {
+	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/jupitertriangles/%s/tags/?page_size=25&ordering=last_updated", image)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("[version] Docker Hub API 실패 (%s): %v — fallback: v%s", image, err, fallbackVersion)
+		return "v" + fallbackVersion
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Results []struct {
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "v" + fallbackVersion
+	}
+
+	// vX.Y.Z 패턴만 추출 후 semver 정렬
+	re := regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
+	var tags []string
+	for _, r := range result.Results {
+		if re.MatchString(r.Name) {
+			tags = append(tags, r.Name)
+		}
+	}
+	if len(tags) == 0 {
+		return "v" + fallbackVersion
+	}
+	sort.Slice(tags, func(i, j int) bool {
+		// 문자열 semver 정렬: 자리수 같으면 lexicographic이 semver와 동일
+		return tags[i] > tags[j]
+	})
+	log.Printf("[version] %s 최신 태그: %s", image, tags[0])
+	return tags[0]
+}
+
+// resolveVersions fetches latest tags from Docker Hub; falls back to VERSION file.
+func resolveVersions() map[string]string {
+	fallback := readVersions()
+	images := map[string]string{
+		"core": "core", "console": "console", "portal": "portal",
+		"dc": "dc", "mail": "mail", "appengine": "appengine",
+	}
+	result := make(map[string]string)
+	for key, img := range images {
+		result[key] = fetchLatestTag("polyon-"+img, fallback[key])
+	}
+	return result
+}
+
 func DomainToDC(domain string) string {
 	parts := strings.Split(strings.ToLower(domain), ".")
 	dcs := make([]string, len(parts))
@@ -104,7 +163,7 @@ func DomainToDC(domain string) string {
 
 // NewTemplateConfig derives computed fields from SetupConfig
 func NewTemplateConfig(cfg SetupConfig) TemplateConfig {
-	versions := readVersions()
+	versions := resolveVersions()
 	domain := cfg.Domain
 	domainUpper := strings.ToUpper(domain)
 
