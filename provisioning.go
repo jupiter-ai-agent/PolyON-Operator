@@ -59,11 +59,13 @@ func runProvisioning(cfg SetupConfig, tcfg TemplateConfig) error {
 	}
 	appendLog("success", "polyon-portal 클라이언트 생성 완료 (polyon realm)")
 
-	// 6.5 Create OIDC client "polyon-erpengine" in polyon realm
+	// 6.5 Create confidential OIDC client "polyon-erpengine" in polyon realm + get secret
 	appendLog("info", "polyon-erpengine OIDC 클라이언트 생성 중...")
-	if err := createOIDCClient(keycloakURL, token, "polyon", "polyon-erpengine", "erp."+tcfg.Domain); err != nil {
+	erpClientSecret, err := createConfidentialOIDCClient(keycloakURL, token, "polyon", "polyon-erpengine", "erp."+tcfg.Domain)
+	if err != nil {
 		return fmt.Errorf("create polyon-erpengine client: %w", err)
 	}
+	tcfg.ERPEngineClientSecret = erpClientSecret
 	appendLog("success", "polyon-erpengine 클라이언트 생성 완료 (polyon realm)")
 
 	// 7. Create local admin user in admin realm (no LDAP)
@@ -524,13 +526,21 @@ metadata:
   namespace: %s
 type: Opaque
 stringData:
-  db_host: "polyon-db"
-  db_port: "5432"
-  db_name: "polyon_erp"
-  db_user: "polyon"
-  db_password: "%s"
-  admin_password: "%s"
-`, tcfg.Namespace, tcfg.DBPassword, tcfg.ConsoleAdminPassword)
+  DB_HOST: "polyon-db"
+  DB_PORT: "5432"
+  DB_NAME: "polyon_erp"
+  DB_USER: "polyon"
+  DB_PASSWORD: "%s"
+  ODOO_ADMIN_PASSWORD: "%s"
+  OIDC_ISSUER: "https://auth.%s/realms/polyon"
+  OIDC_CLIENT_ID: "polyon-erpengine"
+  OIDC_CLIENT_SECRET: "%s"
+  OIDC_AUTH_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/auth"
+  OIDC_TOKEN_ENDPOINT: "https://auth.%s/realms/polyon/protocol/openid-connect/token"
+  OIDC_JWKS_URI: "https://auth.%s/realms/polyon/protocol/openid-connect/certs"
+`, tcfg.Namespace, tcfg.DBPassword, tcfg.ConsoleAdminPassword,
+		tcfg.Domain, tcfg.ERPEngineClientSecret,
+		tcfg.Domain, tcfg.Domain, tcfg.Domain)
 
 	applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", "-")
 	applyCmd.Stdin = strings.NewReader(secretYAML)
@@ -541,4 +551,75 @@ stringData:
 	}
 	appendLog("info", "  polyon-erpengine-secret 생성 완료")
 	return nil
+}
+
+// createConfidentialOIDCClient creates a confidential OIDC client in KC and returns its secret.
+// Used for server-side apps (like ERPEngine/Odoo) that need client_secret for OIDC flows.
+func createConfidentialOIDCClient(baseURL, token, realm, clientID, redirectDomain string) (string, error) {
+	payload := map[string]interface{}{
+		"clientId":     clientID,
+		"enabled":      true,
+		"publicClient": false,
+		"protocol":     "openid-connect",
+		"redirectUris": []string{"https://" + redirectDomain + "/*"},
+		"webOrigins":   []string{"+"},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", baseURL+"/admin/realms/"+realm+"/clients", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 && resp.StatusCode != 409 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("create client %s failed (%d): %s", clientID, resp.StatusCode, string(respBody))
+	}
+
+	// Get client UUID from Location header (only on 201)
+	var clientUUID string
+	if resp.StatusCode == 201 {
+		location := resp.Header.Get("Location")
+		parts := strings.Split(location, "/")
+		if len(parts) > 0 {
+			clientUUID = parts[len(parts)-1]
+		}
+	} else {
+		// 409 = already exists, find by clientId
+		searchReq, _ := http.NewRequest("GET", baseURL+"/admin/realms/"+realm+"/clients?clientId="+clientID, nil)
+		searchReq.Header.Set("Authorization", "Bearer "+token)
+		searchResp, err := client.Do(searchReq)
+		if err != nil {
+			return "", fmt.Errorf("search client: %w", err)
+		}
+		defer searchResp.Body.Close()
+		var clients []map[string]interface{}
+		if err := json.NewDecoder(searchResp.Body).Decode(&clients); err != nil || len(clients) == 0 {
+			return "", fmt.Errorf("client %s not found after 409", clientID)
+		}
+		clientUUID, _ = clients[0]["id"].(string)
+	}
+
+	// Get client secret
+	secretReq, _ := http.NewRequest("GET", baseURL+"/admin/realms/"+realm+"/clients/"+clientUUID+"/client-secret", nil)
+	secretReq.Header.Set("Authorization", "Bearer "+token)
+	secretResp, err := client.Do(secretReq)
+	if err != nil {
+		return "", fmt.Errorf("get client secret: %w", err)
+	}
+	defer secretResp.Body.Close()
+
+	var secretResult struct {
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(secretResp.Body).Decode(&secretResult); err != nil {
+		return "", fmt.Errorf("decode client secret: %w", err)
+	}
+	return secretResult.Value, nil
 }

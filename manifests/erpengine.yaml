@@ -33,37 +33,10 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8069
+          envFrom:
+            - secretRef:
+                name: polyon-erpengine-secret
           env:
-            - name: DB_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: DB_HOST
-            - name: DB_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: DB_PORT
-            - name: DB_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: DB_NAME
-            - name: DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: DB_USER
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: DB_PASSWORD
-            - name: ODOO_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: polyon-erpengine-secret
-                  key: ODOO_ADMIN_PASSWORD
             - name: ODOO_DB_FILTER
               value: "^polyon_erp$"
             - name: ODOO_LIST_DB

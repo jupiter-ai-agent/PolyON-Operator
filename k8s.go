@@ -50,6 +50,7 @@ type TemplateConfig struct {
 	LiteLLMMasterKey      string // LiteLLM AI Gateway master key
 	GiteaAdminPassword    string // Gitea admin password
 	ERPEngineVersion      string // ERPEngine image version (e.g. "v0.5.3")
+	ERPEngineClientSecret string // Keycloak polyon-erpengine client secret (set during provisioning)
 }
 
 // generatePassword creates a random alphanumeric password of given length
