@@ -38,15 +38,23 @@ type SubdomainConfig struct {
 	Portal  string `json:"portal"`  // default: "portal"
 }
 
+// VersionOverrides holds per-component image version overrides from the wizard
+type VersionOverrides struct {
+	Core      string `json:"core"`
+	Console   string `json:"console"`
+	AppEngine string `json:"appEngine"`
+}
+
 // SetupConfig holds the wizard form data
 type SetupConfig struct {
-	Namespace          string          `json:"namespace"`
-	Domain             string          `json:"domain"`
-	AdminPassword      string          `json:"adminPassword"`
-	ConsoleAdminPassword string        `json:"consoleAdminPassword"`
-	OrgName            string          `json:"orgName"`
-	Phase              string          `json:"phase"` // infra, services
-	Subdomains         SubdomainConfig `json:"subdomains"`
+	Namespace          string           `json:"namespace"`
+	Domain             string           `json:"domain"`
+	AdminPassword      string           `json:"adminPassword"`
+	ConsoleAdminPassword string         `json:"consoleAdminPassword"`
+	OrgName            string           `json:"orgName"`
+	Phase              string           `json:"phase"` // infra, services
+	Subdomains         SubdomainConfig  `json:"subdomains"`
+	Versions           VersionOverrides `json:"versions"`
 }
 
 // SetupProgress tracks installation progress
@@ -109,11 +117,22 @@ func init() {
 
 // getOrCreateTemplateConfig returns a cached TemplateConfig, ensuring
 // passwords are generated only once across infra and services phases.
+// Version overrides from the wizard are applied on top of the resolved versions.
 func getOrCreateTemplateConfig(cfg SetupConfig) TemplateConfig {
 	mu.Lock()
 	defer mu.Unlock()
 	if cachedTemplateConfig == nil {
 		tc := NewTemplateConfig(cfg)
+		// Apply per-component version overrides if provided
+		if cfg.Versions.Core != "" {
+			tc.CoreVersion = "v" + strings.TrimPrefix(cfg.Versions.Core, "v")
+		}
+		if cfg.Versions.Console != "" {
+			tc.ConsoleVersion = "v" + strings.TrimPrefix(cfg.Versions.Console, "v")
+		}
+		if cfg.Versions.AppEngine != "" {
+			tc.AppEngineVersion = "v" + strings.TrimPrefix(cfg.Versions.AppEngine, "v")
+		}
 		cachedTemplateConfig = &tc
 	}
 	return *cachedTemplateConfig
@@ -158,6 +177,17 @@ func main() {
 		json.NewEncoder(w).Encode(logBuffer)
 	})
 
+	// Get available image versions per component from Docker Hub
+	http.HandleFunc("/api/versions", func(w http.ResponseWriter, r *http.Request) {
+		images := []string{"polyon-core", "polyon-console", "polyon-appengine", "polyon-operator"}
+		result := map[string][]string{}
+		for _, img := range images {
+			result[img] = fetchRecentTags("jupitertriangles/"+img, 5)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
 	// Start setup phase
 	http.HandleFunc("/api/setup", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -198,7 +228,7 @@ func main() {
 		json.NewEncoder(w).Encode(map[string]string{"status": "started", "phase": cfg.Phase})
 	})
 
-	log.Printf("PolyON Operator v0.7.9 starting on :%s", port)
+	log.Printf("PolyON Operator v0.8.4 starting on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 

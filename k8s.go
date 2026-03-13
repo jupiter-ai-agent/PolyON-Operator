@@ -138,6 +138,52 @@ func fetchLatestTag(image, fallbackVersion string) string {
 	return tags[0]
 }
 
+// fetchRecentTags queries Docker Hub for the N most recent vX.Y.Z tags of a repo.
+// Falls back to current VERSION file value on any error.
+func fetchRecentTags(repo string, n int) []string {
+	fallback := readVersions()
+	// derive image name from repo "jupitertriangles/polyon-xxx"
+	parts := strings.SplitN(repo, "/", 2)
+	imgName := parts[len(parts)-1] // e.g. "polyon-core"
+	key := strings.TrimPrefix(imgName, "polyon-") // e.g. "core"
+	fallbackVer := "v" + fallback[key]
+
+	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/tags?page_size=%d&ordering=-last_updated", repo, n*5)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("[version] fetchRecentTags 실패 (%s): %v", repo, err)
+		return []string{fallbackVer}
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Results []struct {
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return []string{fallbackVer}
+	}
+
+	re := regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)$`)
+	var tags []string
+	for _, r := range result.Results {
+		if re.MatchString(r.Name) {
+			tags = append(tags, r.Name)
+		}
+	}
+	sort.Slice(tags, func(i, j int) bool { return tags[i] > tags[j] })
+	if len(tags) == 0 {
+		return []string{fallbackVer}
+	}
+	if len(tags) > n {
+		tags = tags[:n]
+	}
+	return tags
+}
+
 // resolveVersions fetches latest tags from Docker Hub; falls back to VERSION file.
 func resolveVersions() map[string]string {
 	fallback := readVersions()

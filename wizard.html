@@ -294,6 +294,26 @@
       </div>
     </div>
 
+    <!-- 이미지 버전 설정 -->
+    <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid #393939;">
+      <div style="font-size:0.75rem; font-weight:500; color:var(--text-secondary); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.32px;">
+        이미지 버전
+        <span id="version-loading" style="margin-left:0.5rem; color:#6f6f6f; font-weight:400; text-transform:none; letter-spacing:normal;">불러오는 중...</span>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Core</label>
+        <select id="ver-core"></select>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>Console</label>
+        <select id="ver-console"></select>
+      </div>
+      <div class="field" style="margin-bottom:0.75rem;">
+        <label>AppEngine (ERP)</label>
+        <select id="ver-appengine"></select>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" onclick="goToStep(2)">다음</button>
     </div>
@@ -374,6 +394,9 @@ let phaseStartTime = 0;
 let logPollTimer = null;
 let lastLogCount = 0;
 
+// Load version dropdowns on page ready
+document.addEventListener('DOMContentLoaded', loadVersions);
+
 // Password visibility toggle
 function togglePw(btn) {
   const wrapper = btn.closest('.pw-wrapper');
@@ -399,6 +422,32 @@ document.getElementById('domain').addEventListener('input', function() {
   });
 });
 
+async function loadVersions() {
+  try {
+    const res = await fetch('/api/versions');
+    const data = await res.json();
+    document.getElementById('version-loading').style.display = 'none';
+    fillSelect('ver-core', data['polyon-core'] || []);
+    fillSelect('ver-console', data['polyon-console'] || []);
+    fillSelect('ver-appengine', data['polyon-appengine'] || []);
+  } catch(e) {
+    document.getElementById('version-loading').textContent = '버전 조회 실패 (기본값 사용)';
+  }
+}
+
+function fillSelect(id, tags) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = '';
+  tags.forEach((tag, i) => {
+    const opt = document.createElement('option');
+    opt.value = tag;
+    opt.textContent = tag + (i === 0 ? ' (최신)' : '');
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
 function goToStep(step) {
   // Validate Step 1
   if (currentStep === 1 && step === 2) {
@@ -421,6 +470,11 @@ function goToStep(step) {
         mail: document.getElementById('sub-mail').value.trim() || 'mail',
         portal: document.getElementById('sub-portal').value.trim() || 'portal',
         appEngine: document.getElementById('sub-appengine').value.trim() || 'apps'
+      },
+      versions: {
+        core: document.getElementById('ver-core').value || '',
+        console: document.getElementById('ver-console').value || '',
+        appEngine: document.getElementById('ver-appengine').value || ''
       }
     };
   }
