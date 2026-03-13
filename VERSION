@@ -1,7 +1,7 @@
 core=1.14.8
 console=1.10.19
 portal=0.2.0
-operator=0.8.2
+operator=0.8.3
 dc=1.0.2
 mail=1.0.0
 appengine=0.5.10

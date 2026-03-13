@@ -3,6 +3,7 @@ WORKDIR /build
 COPY go.mod go.sum* ./
 COPY *.go ./
 COPY wizard.html ./
+COPY VERSION ./
 COPY manifests/ manifests/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /polyon-operator .
 
