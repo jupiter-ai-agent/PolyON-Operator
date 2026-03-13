@@ -509,7 +509,7 @@ stringData:
   LDAP_HOST: "polyon-dc"
   LDAP_PORT: "389"
   LDAP_BASE_DN: "%s"
-  LDAP_USERS_DN: "CN=Users,%s"
+  LDAP_USERS_DN: "%s"
   LDAP_GROUPS_DN: "%s"
   LDAP_BIND_DN: "CN=Administrator,CN=Users,%s"
   LDAP_BIND_PASSWORD: "%s"
